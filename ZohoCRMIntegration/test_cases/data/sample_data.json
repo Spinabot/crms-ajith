@@ -1,0 +1,86 @@
+{
+    "data": [
+        {
+            "Annual_Revenue": 1500000,
+            "City": "Los Angeles",
+            "Company": "Innovatech Solutions",
+            "Country": "United States",
+            "Created_By": {
+                "email": "developer@spinabot.com",
+                "id": "6707647000000503001",
+                "name": "karhteek V"
+            },
+            "Created_Time": "2025-05-01T04:15:20-04:00",
+            "Email": "elon.musk@example.com",
+            "First_Name": "Elon",
+            "Industry": "Technology",
+            "Last_Name": "Musk",
+            "Lead_Source": "Webinar",
+            "Lead_Status": "New",
+            "Mobile": "555-555-9999",
+            "Modified_By": {
+                "email": "developer@spinabot.com",
+                "id": "6707647000000503001",
+                "name": "karhteek V"
+            },
+            "Modified_Time": "2025-05-01T04:15:20-04:00",
+            "No_of_Employees": 1000,
+            "Owner": {
+                "email": "developer@spinabot.com",
+                "id": "6707647000000503001",
+                "name": "karhteek V"
+            },
+            "Phone": "555-555-9999",
+            "Rating": "A",
+            "Secondary_Email": "emusk@secondary.com",
+            "Skype_ID": "elonmusk",
+            "State": "CA",
+            "Street": "789 Tech Park",
+            "Website": "http://www.innovatechsolutions.com",
+            "Zip_Code": "54321",
+            "id": "6707647000000665006"
+        },
+        {
+            "Annual_Revenue": 1800000,
+            "City": "Chicago",
+            "Company": "EcoGreen Technologies",
+            "Country": "United States",
+            "Created_By": {
+                "email": "developer@spinabot.com",
+                "id": "6707647000000503001",
+                "name": "karhteek V"
+            },
+            "Created_Time": "2025-05-01T04:25:30-04:00",
+            "Email": "jeff.bezos@example.com",
+            "First_Name": "Jeff",
+            "Industry": "Technology",
+            "Last_Name": "Bezos",
+            "Lead_Source": "Conference",
+            "Lead_Status": "Qualified",
+            "Mobile": "555-555-0000",
+            "Modified_By": {
+                "email": "developer@spinabot.com",
+                "id": "6707647000000503001",
+                "name": "karhteek V"
+            },
+            "Modified_Time": "2025-05-01T04:25:30-04:00",
+            "No_of_Employees": 2500,
+            "Owner": {
+                "email": "developer@spinabot.com",
+                "id": "6707647000000503001",
+                "name": "karhteek V"
+            },
+            "Phone": "555-555-0000",
+            "Rating": "B",
+            "Secondary_Email": "jbezos@secondary.com",
+            "Skype_ID": "jeffbezos",
+            "State": "IL",
+            "Street": "321 Green Ave",
+            "Website": "http://www.ecogreentech.com",
+            "Zip_Code": "67890",
+            "id": "6707647000000665007"
+        }
+    ]
+}
+
+

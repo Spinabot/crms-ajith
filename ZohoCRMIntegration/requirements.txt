@@ -1,0 +1,13 @@
+flask 
+gunicorn
+PyJWT==2.10.1
+requests
+python-dotenv
+flask_sqlalchemy
+psycopg2
+redis 
+flask-limiter
+alembic 
+pytest
+flasgger
+flask_swagger_ui
