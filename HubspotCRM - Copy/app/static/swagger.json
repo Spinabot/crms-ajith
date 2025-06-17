@@ -1,0 +1,320 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "HubSpot CRM API",
+    "version": "1.0.0",
+    "description": "API for managing HubSpot contacts"
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "paths": {
+    "/contacts": {
+      "post": {
+        "summary": "Create a new contact",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Contact created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contact"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List all contacts",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of contacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/{contact_id}": {
+      "get": {
+        "summary": "Get contact details",
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contact"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update a contact",
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact updated successfully"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a contact",
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Contact deleted successfully"
+          }
+        }
+      }
+    },
+    "/contacts/search": {
+      "post": {
+        "summary": "Search contacts",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchFilters"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/batch": {
+      "post": {
+        "summary": "Batch operations",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchOperation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch operation results"
+          }
+        }
+      }
+    },
+    "/contacts/{contact_id}/associations": {
+      "post": {
+        "summary": "Create association",
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Association"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Association created successfully"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "email": {"type": "string"},
+          "firstname": {"type": "string"},
+          "lastname": {"type": "string"},
+          "phone": {"type": "string"},
+          "company": {"type": "string"},
+          "website": {"type": "string"},
+          "lifecyclestage": {"type": "string"}
+        }
+      },
+      "ContactCreate": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": {"type": "string"},
+          "firstname": {"type": "string"},
+          "lastname": {"type": "string"},
+          "phone": {"type": "string"},
+          "company": {"type": "string"},
+          "website": {"type": "string"},
+          "lifecyclestage": {"type": "string"}
+        }
+      },
+      "ContactUpdate": {
+        "type": "object",
+        "properties": {
+          "email": {"type": "string"},
+          "firstname": {"type": "string"},
+          "lastname": {"type": "string"},
+          "phone": {"type": "string"},
+          "company": {"type": "string"},
+          "website": {"type": "string"},
+          "lifecyclestage": {"type": "string"}
+        }
+      },
+      "ContactList": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Contact"
+            }
+          },
+          "total": {"type": "integer"},
+          "pages": {"type": "integer"},
+          "current_page": {"type": "integer"}
+        }
+      },
+      "SearchFilters": {
+        "type": "object",
+        "properties": {
+          "email": {"type": "string"},
+          "name": {"type": "string"},
+          "company": {"type": "string"},
+          "page": {"type": "integer"},
+          "per_page": {"type": "integer"}
+        }
+      },
+      "BatchOperation": {
+        "type": "object",
+        "required": ["operation", "contacts"],
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": ["create", "update", "delete"]
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {"$ref": "#/components/schemas/ContactCreate"},
+                {"$ref": "#/components/schemas/ContactUpdate"},
+                {"type": "string"}
+              ]
+            }
+          }
+        }
+      },
+      "Association": {
+        "type": "object",
+        "required": ["to_object_type", "to_object_id"],
+        "properties": {
+          "to_object_type": {"type": "string"},
+          "to_object_id": {"type": "string"},
+          "association_type": {"type": "string"}
+        }
+      }
+    }
+  }
+} 
