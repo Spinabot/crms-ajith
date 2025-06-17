@@ -16,8 +16,7 @@ services:
     networks:
       - zohocrm_network
     command: ["bash", "/app/entrypoint.sh"]
-    environment:
-      RATELIMIT_STORAGE_URL: redis://redis:6379/0
+
 
   # PostgreSQL Service
   postgres:

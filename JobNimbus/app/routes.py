@@ -9,6 +9,7 @@ from app.database import db
 from app.models import Contact
 from app.utils import jobnimbus_request
 
+
 main = Blueprint("main", __name__)
 api = Api(main, version='1.0', title='JobNimbus API',
           description='A RESTful API for managing JobNimbus contacts')

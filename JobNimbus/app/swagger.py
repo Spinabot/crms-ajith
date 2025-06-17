@@ -3,7 +3,7 @@ from flask import Blueprint, request
 from app.config import CONTACTS_ENDPOINT
 from app.database import db
 from app.models import Contact
-from app.utils.jobnimbus import jobnimbus_request
+from app.utils import jobnimbus_request
 
 swagger_bp = Blueprint('swagger', __name__)
 
