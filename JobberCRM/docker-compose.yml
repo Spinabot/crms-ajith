@@ -1,50 +1,49 @@
-#version: "3.8"
-
+version: "3.8"
+# only for development not needed for production deployment 
 services:
-  # flaskapi App Service
+  # FastAPI App Service
   app:
     build: 
         context: .
-    container_name: zohocrm
+    container_name: jobbercrm_app
     volumes:
       - ./src:/app/src
     depends_on:
       - postgres
       - redis
     ports:
-      - "5000:5000" #connect port 5000 of local host to 5000 of docker
+      - "8000:8000"
     networks:
-      - zohocrm_network
+      - jobbercrm_network
     command: ["bash", "/app/entrypoint.sh"]
-    environment:
-      RATELIMIT_STORAGE_URL: redis://redis:6379/0
 
   # PostgreSQL Service
   postgres:
     image: postgres:17.4
-    container_name: zohocrm_postgres
+    container_name: jobbercrm_postgres
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - zohocrm_network
+      - jobbercrm_network
     ports:
       - "5432:5432"
-
-  
   # Redis Service
   redis:
     image: redis:7.4
-    container_name: zohocrm_redis
+    container_name: jobbercrm_redis
     networks:
-      - zohocrm_network
-
-
+      - jobbercrm_network
 
 networks:
-  zohocrm_network:
+  jobbercrm_network:
     driver: bridge
 
 volumes:
   postgres_data:
     driver: local
-

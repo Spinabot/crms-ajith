@@ -1,0 +1,170 @@
+name: Build and Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  environment: prod
+
+jobs:
+  
+  setup-infra:
+    uses: FutureRemodelAI/remodelai-infrastructure/.github/workflows/terraform.yml@main
+    with:
+      environment: dev
+      github_branch: ${{ github.ref_name }}
+      github_org: ${{ github.repository_owner }}
+      github_repo: ${{ github.event.repository.name }}
+    secrets: inherit
+
+  read-infra-outputs:
+    needs: setup-infra
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_registry_url: ${{ steps.parse.outputs.artifact_registry_url }}
+      pool_full_path: ${{ steps.parse.outputs.pool_full_path }}
+      github_secrets_sa: ${{ steps.parse.outputs.github_secrets_sa }}
+      github_builder_sa: ${{ steps.parse.outputs.github_builder_sa }}
+      github_deployer_sa: ${{ steps.parse.outputs.github_deployer_sa }}
+      created_subdomain: ${{ steps.parse.outputs.created_subdomain }}
+      github_dns_sa: ${{ steps.parse.outputs.github_dns_sa }}
+    steps:
+      - name: Download Terraform Output Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-outputs
+
+      - name: Read and Export Outputs
+        id: parse
+        run: |
+          data=$(cat infra-outputs.json)
+          echo "artifact_registry_url=$(echo $data | jq -r '.artifact_registry_url')" >> $GITHUB_OUTPUT
+          echo "pool_full_path=$(echo $data | jq -r '.pool_full_path')" >> $GITHUB_OUTPUT
+          echo "github_secrets_sa=$(echo $data | jq -r '.github_secrets_sa')" >> $GITHUB_OUTPUT
+          echo "github_builder_sa=$(echo $data | jq -r '.github_builder_sa')" >> $GITHUB_OUTPUT
+          echo "github_deployer_sa=$(echo $data | jq -r '.github_deployer_sa')" >> $GITHUB_OUTPUT
+          echo "created_subdomain=$(echo $data | jq -r '.created_subdomain')" >> $GITHUB_OUTPUT
+          echo "github_dns_sa=$(echo $data | jq -r '.github_dns_sa')" >> $GITHUB_OUTPUT
+
+  build-and-deploy:
+    needs: [setup-infra, read-infra-outputs]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      # Step 1: Check out the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 3: Set up Python 11
+      - name: Set up Python 11
+        uses: actions/setup-python@v3
+        with:
+          python-version: 11
+
+      
+
+      # Step 4: Authenticate using Workload Identity Federation (for Secrets and Initial gcloud)
+      - name: Authenticate via WIF for Build
+        id: auth-build
+        uses: google-github-actions/auth@v0.4.0
+        with:
+          workload_identity_provider: ${{needs.read-infra-outputs.outputs.pool_full_path }}
+          service_account: ${{needs.read-infra-outputs.outputs.github_secrets_sa}}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      # Step 5: Pull Secrets from Google Secret Manager
+      - name: Fetch Secrets from Google Secret Manager
+        id: secrets
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          export_to_environment: true
+          secrets: |-
+            DEV_CONNECTION_NAME:projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_CONNECTION_NAME
+            DEV_CONVERSATION_SERVICE_URL:projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_CONVERSATION_SERVICE_URL
+            DEV_DATABASE_NAME:projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_DATABASE_NAME
+            DEV_DB_PASSWORD:projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_DB_PASSWORD
+            DEV_DB_USER:projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_DB_USER
+            DEV_IDENTITY_SERVICE_URL:projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_IDENTITY_SERVICE_URL
+            DEV_INVITATION_SERVICE_URL:projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_INVITATION_SERVICE_URL
+            DEV_ORGANIZATION_ARTIFACT_REGISTRY_PATH:projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_ORGANIZATION_ARTIFACT_REGISTRY_PATH
+            DEV_PAYMENT_SERVICE_URL:projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_PAYMENT_SERVICE_URL
+            DEV_URL:projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_URL
+
+      # Step 6: Capture SPRING_ACTIVE_PROFILE from GitHub environment into the runner’s env
+      - name: Set SPRING_ACTIVE_PROFILE in runner environment
+        run: echo "SPRING_ACTIVE_PROFILE=dev" >> $GITHUB_ENV
+
+      # Step 7: Build the application
+      - name: Build the application
+        run: gunicorn -k eventlet -w 1 -b 0.0.0.0:8080 run:app
+
+      - name: Authenticate via WIF for Build and Push
+        id: auth-build-push
+        uses: google-github-actions/auth@v0.4.0
+        with:
+          workload_identity_provider: ${{needs.read-infra-outputs.outputs.pool_full_path}}
+          service_account: ${{needs.read-infra-outputs.outputs.github_builder_sa }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          token_format: "access_token"
+          access_token_scopes: "https://www.googleapis.com/auth/cloud-platform"
+
+      - name: Re-configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{secrets.GCP_PREFERRED_REGION}}-docker.pkg.dev --quiet
+        env:
+          CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: ${{ steps.auth-build-push.outputs.credentials_file_path }}
+
+      # Step 8: Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t "${{needs.read-infra-outputs.outputs.artifact_registry_url}}/${{env.environment}}-${{secrets.APP_NAME}}-api:latest" .
+
+      # Step 9: Push Docker image
+      - name: Push Docker image
+        run: |
+          docker push "${{needs.read-infra-outputs.outputs.artifact_registry_url}}/${{env.environment}}-${{secrets.APP_NAME}}-api:latest"
+
+      # Step 10: Re-authenticate using Workload Identity Federation for Deployment
+      - name: Authenticate via WIF for Deployment
+        id: auth-deploy
+        uses: google-github-actions/auth@v0.4.0
+        with:
+          workload_identity_provider: ${{needs.read-infra-outputs.outputs.pool_full_path}}
+          service_account: ${{ needs.read-infra-outputs.outputs.github_deployer_sa}}
+
+      # Step 11: Deploy to Cloud Run
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{env.environment}}-${{secrets.APP_NAME}}-api \
+            --image "${{needs.read-infra-outputs.outputs.artifact_registry_url}}/${{env.environment}}-${{secrets.APP_NAME}}-api:latest" \
+            --region ${{secrets.GCP_PREFERRED_REGION}} \
+            --platform managed \
+            --allow-unauthenticated \
+            --add-cloudsql-instances="${DEV_CONNECTION_NAME}" \
+            --set-secrets="DEV_CONNECTION_NAME=projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_CONNECTION_NAME:latest,DEV_CONVERSATION_SERVICE_URL=projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_CONVERSATION_SERVICE_URL:latest,DEV_DATABASE_NAME=projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_DATABASE_NAME:latest,DEV_DB_PASSWORD=projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_DB_PASSWORD:latest,DEV_DB_USER=projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_DB_USER:latest,DEV_IDENTITY_SERVICE_URL=projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_IDENTITY_SERVICE_URL:latest,DEV_INVITATION_SERVICE_URL=projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_INVITATION_SERVICE_URL:latest,DEV_PAYMENT_SERVICE_URL=projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_PAYMENT_SERVICE_URL:latest,DEV_URL=projects/${{secrets.GCP_PROJECT_NUMBER}}/secrets/DEV_URL:latest" \
+            --set-env-vars "SPRING_ACTIVE_PROFILE=${{env.environment}}"
+
+      #Step 12: Auth to attach the sub domain for the service
+      - name: Authenticate via WIF for DNS
+        id: auth-dns
+        uses: google-github-actions/auth@v0.4.0
+        with:
+          workload_identity_provider: ${{needs.read-infra-outputs.outputs.pool_full_path}}
+          service_account: ${{needs.read-infra-outputs.outputs.github_dns_sa}}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      # Step 13: Attach the subdomain to the Cloud Run service
+      - name: Attach subdomain to Cloud Run service
+        run: |
+          gcloud alpha run domain-mappings create \
+            --service ${{ env.environment }}-${{ secrets.APP_NAME }}-api \
+            --domain "${{ needs.read-infra-outputs.outputs.created_subdomain }}" \
+            --region ${{ secrets.GCP_PREFERRED_REGION }}

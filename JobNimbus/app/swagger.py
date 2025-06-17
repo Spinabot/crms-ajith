@@ -3,38 +3,32 @@ from flask import Blueprint, request
 from app.config import CONTACTS_ENDPOINT
 from app.database import db
 from app.models import Contact
-from app.utils import jobnimbus_request
+from app.utils.jobnimbus import jobnimbus_request
 
 swagger_bp = Blueprint('swagger', __name__)
 
-authorizations = {
-    'bearer': {
-        'type': 'apiKey',
-        'in': 'header',
-        'name': 'Authorization',
-        'description': 'Bearer token for JobNimbus API'
-    }
-}
-
 api = Api(swagger_bp,
-    title='JobNimbus API',
+    title='JobNimbus Contacts API',
     version='1.0',
     description='''
-    API for managing JobNimbus contacts
+    Flask-based REST API for managing contacts using JobNimbus. 
+    Supports full CRUD operations and is backed by a PostgreSQL database.
     
-    Authentication:
-    - Add your JobNimbus API token in the header: Authorization: bearer <token>
+    Features:
+    - Create, Read, Update, and Delete JobNimbus contacts
+    - PostgreSQL database integration with SQLAlchemy
+    - Modular Flask project structure
+    - Environment-specific configuration support
     
     Operations:
+    - Health Check: GET /
     - List Contacts: GET /contacts
     - Create Contact: POST /contacts
     - Get Contact: GET /contacts/{jnid}
     - Update Contact: PUT /contacts/{jnid}
-    - Delete Contact: PUT /contacts/{jnid} (soft delete)
+    - Archive Contact: DELETE /contacts/{jnid}
     ''',
-    doc='/swagger',
-    authorizations=authorizations,
-    security='bearer'
+    doc='/swagger'
 )
 
 contacts_ns = api.namespace('', description='Operations for managing JobNimbus contacts')
@@ -47,16 +41,17 @@ geo_model = api.model('Geo', {
 
 contact_model = api.model('Contact', {
     'jnid': fields.String(description='JobNimbus ID'),
-    'first_name': fields.String(required=True, example="Sammy G", description='First name'),
-    'last_name': fields.String(required=True, example="Kent", description='Last name'),
-    'display_name': fields.String(example="Sammy G Kent", description='Display name'),
-    'company': fields.String(example="Wayne Enterprises", description='Company name'),
+    'first_name': fields.String(required=True, example="John", description='First name'),
+    'last_name': fields.String(required=True, example="Doe", description='Last name'),
+    'display_name': fields.String(example="JD", description='Display name'),
+    'company': fields.String(example="Acme", description='Company name'),
+    'company_name': fields.String(example="Acme Corp", description='Company name (alternative field)'),
     'status': fields.Integer(example=2, description='Status ID'),
-    'status_name': fields.String(required=True, example="Lead", description='Status name'),
+    'status_name': fields.String(required=True, example="Active", description='Status name'),
     'record_type': fields.Integer(example=1, description='Record type ID'),
-    'record_type_name': fields.String(required=True, example="Customer", description='Record type name'),
+    'record_type_name': fields.String(required=True, example="Lead", description='Record type name'),
     'source': fields.Integer(example=1, description='Source ID'),
-    'source_name': fields.String(example="Referral", description='Source name'),
+    'source_name': fields.String(example="Facebook", description='Source name'),
     'address_line1': fields.String(example="123 S. Bat Street", description='Address line 1'),
     'address_line2': fields.String(example="Apt C", description='Address line 2'),
     'city': fields.String(example="Heber City", description='City'),
@@ -74,16 +69,51 @@ contact_model = api.model('Contact', {
     'description': fields.String(example="Likes to wear costumes...", description='Contact description')
 })
 
-error_model = api.model('Error', {
-    'error': fields.String(description='Error message')
+contact_create_model = api.model('ContactCreate', {
+    'first_name': fields.String(required=True, example="John", description='First name'),
+    'last_name': fields.String(required=True, example="Doe", description='Last name'),
+    'display_name': fields.String(example="JD", description='Display name'),
+    'company_name': fields.String(example="Acme", description='Company name'),
+    'record_type_name': fields.String(required=True, example="Lead", description='Record type name'),
+    'status_name': fields.String(required=True, example="Active", description='Status name'),
+    'source_name': fields.String(example="Facebook", description='Source name')
 })
 
-success_model = api.model('Success', {
-    'message': fields.String(description='Success message')
+contact_update_model = api.model('ContactUpdate', {
+    'status_name': fields.String(example="Prospect", description='Status name to update'),
+    'first_name': fields.String(example="John", description='First name'),
+    'last_name': fields.String(example="Doe", description='Last name'),
+    'company': fields.String(example="Acme Corp", description='Company name'),
+    'email': fields.String(example="john.doe@example.com", description='Email address'),
+    'phone': fields.String(example="+1234567890", description='Phone number')
+})
+
+contact_response = api.model('ContactResponse', {
+    'jnid': fields.String(description="JobNimbus contact ID"),
+    'first_name': fields.String(description="Contact's first name"),
+    'last_name': fields.String(description="Contact's last name"),
+    'display_name': fields.String(description="Contact's display name"),
+    'company': fields.String(description="Contact's company"),
+    'email': fields.String(description="Contact's email address"),
+    'status_name': fields.String(description="Contact's status"),
+    'record_type_name': fields.String(description="Contact's record type"),
+    'source_name': fields.String(description="Contact's source"),
+    'created_by_name': fields.String(description="Created by"),
+    'is_active': fields.Boolean(description="Whether the contact is active")
 })
 
 delete_request_model = api.model('DeleteRequest', {
     'is_active': fields.Boolean(required=True, example=False, description='Whether the contact is active')
+})
+
+delete_response = api.model('DeleteResponse', {
+    'message': fields.String(description="Success message"),
+    'jnid': fields.String(description="Archived contact ID")
+})
+
+health_model = api.model('Health', {
+    'status': fields.String(description='Service status'),
+    'message': fields.String(description='Health check message')
 })
 
 # Query parameters for GET /contacts
@@ -95,37 +125,57 @@ get_parser.add_argument('sort_direction', type=str, default='desc', help='Sort d
 get_parser.add_argument('fields', type=str, help='Comma-separated list of fields to include')
 get_parser.add_argument('filter', type=str, help='URL encoded JSON filter object')
 
+@api.route('/')
+class HealthResource(Resource):
+    @api.doc('health_check',
+        responses={
+            200: 'Service is healthy',
+            500: 'Service is unhealthy'
+        }
+    )
+    @api.marshal_with(health_model)
+    def get(self):
+        """Health check endpoint
+        
+        Returns the health status of the service.
+        """
+        return {
+            'status': 'healthy',
+            'message': 'JobNimbus Contacts API is running'
+        }, 200
+
 @contacts_ns.route('/contacts')
 class ContactsResource(Resource):
     @api.doc('list_contacts',
-        security='bearer',
         responses={
             200: 'Success',
-            401: 'No API token provided',
-            403: 'Invalid API token',
             500: 'Server error'
         }
     )
     @api.expect(get_parser)
-    @api.marshal_with(contact_model, as_list=True)
+    @api.marshal_with(contact_response, as_list=True)
     def get(self):
-        """List all contacts with pagination and filtering"""
+        """List all contacts with pagination and filtering
+        
+        Retrieves all contacts from JobNimbus with support for:
+        - Pagination (size, from parameters)
+        - Sorting (sort_field, sort_direction)
+        - Field filtering (fields parameter)
+        - JSON filtering (filter parameter)
+        """
         args = get_parser.parse_args()
         data, status = jobnimbus_request("GET", CONTACTS_ENDPOINT, params=args)
         return data, status
 
     @api.doc('create_contact',
-        security='bearer',
         responses={
             200: 'Contact created successfully',
             400: 'Invalid request data',
-            401: 'No API token provided',
-            403: 'Invalid API token',
             500: 'Server error'
         }
     )
-    @api.expect(contact_model)
-    @api.marshal_with(contact_model)
+    @api.expect(contact_create_model)
+    @api.marshal_with(contact_response)
     def post(self):
         """Create a new contact
         
@@ -134,6 +184,17 @@ class ContactsResource(Resource):
         - record_type_name is required and should be a workflow name defined in the customer's JobNimbus contact workflow settings
         - status_name is required and should be a status defined within the record_type_name workflow
         - source_name is optional but if provided should be set to one of the lead source names defined in the customer's settings
+        
+        Example request body:
+        {
+          "first_name": "John",
+          "last_name": "Doe",
+          "display_name": "JD",
+          "company_name": "Acme",
+          "record_type_name": "Lead",
+          "status_name": "Active",
+          "source_name": "Facebook"
+        }
         """
         contact_data = request.get_json()
         if not contact_data:
@@ -174,16 +235,13 @@ class ContactsResource(Resource):
 @contacts_ns.route('/contacts/<string:jnid>')
 class ContactResource(Resource):
     @api.doc('get_contact',
-        security='bearer',
         responses={
             200: 'Success',
-            401: 'No API token provided',
-            403: 'Invalid API token',
             404: 'Contact not found',
             500: 'Server error'
         }
     )
-    @api.marshal_with(contact_model)
+    @api.marshal_with(contact_response)
     def get(self, jnid):
         """Get a contact by ID
         
@@ -196,23 +254,25 @@ class ContactResource(Resource):
         return {"error": "Contact not found"}, 404
 
     @api.doc('update_contact',
-        security='bearer',
         responses={
             200: 'Contact updated successfully',
             400: 'Invalid request data',
-            401: 'No API token provided',
-            403: 'Invalid API token',
             404: 'Contact not found',
             500: 'Server error'
         }
     )
-    @api.expect(contact_model)
-    @api.marshal_with(contact_model)
+    @api.expect(contact_update_model)
+    @api.marshal_with(contact_response)
     def put(self, jnid):
         """Update a contact
         
         Notes:
         - Mandatory field(s): jnid
+        
+        Example request body:
+        {
+          "status_name": "Prospect"
+        }
         """
         data = request.get_json()
         contact = db.session.get(Contact, jnid)
@@ -228,25 +288,23 @@ class ContactResource(Resource):
         jn_data, jn_status = jobnimbus_request("PUT", f"{CONTACTS_ENDPOINT}/{jnid}", json=data)
         return jn_data, jn_status
 
-    @api.doc('delete_contact',
-        security='bearer',
+    @api.doc('archive_contact',
         responses={
-            200: 'Contact deleted successfully',
+            200: 'Contact archived successfully',
             400: 'Invalid request data',
-            401: 'No API token provided',
-            403: 'Invalid API token',
             404: 'Contact not found',
             500: 'Server error'
         }
     )
     @api.expect(delete_request_model)
-    @api.marshal_with(success_model)
+    @api.marshal_with(delete_response)
     def delete(self, jnid):
-        """Soft delete a contact
+        """Archive a contact (soft delete)
         
         Notes:
         - Mandatory field(s): jnid
         - This is a soft delete that sets is_active to false
+        - The contact is archived rather than permanently deleted
         """
         contact = db.session.get(Contact, jnid)
         if not contact:
@@ -268,5 +326,5 @@ class ContactResource(Resource):
         )
 
         if jn_status == 200:
-            return {"message": "Contact deleted successfully"}, 200
-        return {"error": "Failed to delete contact"}, jn_status 
+            return {"message": "Contact archived successfully", "jnid": jnid}, 200
+        return {"error": "Failed to archive contact"}, jn_status 

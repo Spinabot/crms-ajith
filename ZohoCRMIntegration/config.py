@@ -10,20 +10,20 @@ class Config:
     redirect_uri = os.getenv("ZOHO_REDIRECT_URI", "default_redirect_uri")
     
     # Database Configuration
-    database_name = os.getenv("DATABASE_NAME", "default_database_name")
-    database_user = os.getenv("DB_USER", "default_db_user")
-    database_pass = os.getenv("DB_PASSWORD", "default_db_password")
-    database_host = os.getenv("CONNECTION_NAME", "default_connection_name")
+    database_name = os.getenv("DATABASE_NAME", "postgres")
+    database_user = os.getenv("DB_USER", "postgres")
+    database_pass = os.getenv("DB_PASSWORD", "")
+    database_host = os.getenv("CONNECTION_NAME", "localhost")
     SQLALCHEMY_DATABASE_URI = f"postgresql://{database_user}:{database_pass}@{database_host}/{database_name}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     # Application Secret
     SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")
     
     # Redis Configuration
-    redis_host = os.getenv("CACHE_REDIS_HOST", "default_redis_host")
-    redis_port = os.getenv("CACHE_REDIS_PORT", "default_redis_port")
-    redis_username = os.getenv("CACHE_REDIS_USERNAME", "default_redis_username")
-    redis_password = os.getenv("CACHE_REDIS_PASSWORD", "default_redis_password")
+    redis_host = os.getenv("CACHE_REDIS_HOST", "localhost")
+    redis_port = os.getenv("CACHE_REDIS_PORT", "6379")
+    redis_username = os.getenv("CACHE_REDIS_USERNAME", "redis")
+    redis_password = os.getenv("CACHE_REDIS_PASSWORD", "redis")
     
     # Gunicorn Configuration
     gunicorn_workers = os.getenv("GUNICORN_WORKERS", "2")
