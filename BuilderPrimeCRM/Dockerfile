@@ -14,6 +14,7 @@ RUN echo "🛠️ Base stage ended..."
 # Development Stage
 FROM base AS development
 ENV FLASK_ENV=development
+RUN pip install gunicorn
 COPY . .
 RUN chmod +x entrypoint.sh
 COPY .env .env

@@ -14,3 +14,6 @@ Zoho:
   make .env and copy values in readme
   make venv and run pytest
   
+
+  BuilderPrime
+make sure to migrate db
