@@ -1,4 +1,4 @@
-#version: "3.8"
+version: "3.8"
 
 services:
   # flaskapi App Service
@@ -17,7 +17,6 @@ services:
       - zohocrm_network
     command: ["bash", "/app/entrypoint.sh"]
 
-
   # PostgreSQL Service
   postgres:
     image: postgres:17.4
@@ -28,16 +27,12 @@ services:
       - zohocrm_network
     ports:
       - "5432:5432"
-
-  
   # Redis Service
   redis:
     image: redis:7.4
     container_name: zohocrm_redis
     networks:
       - zohocrm_network
-
-
 
 networks:
   zohocrm_network:
@@ -46,4 +41,3 @@ networks:
 volumes:
   postgres_data:
     driver: local
-

@@ -9,3 +9,8 @@ Hubspot: -
                 make contact table
 
 
+Zoho:
+  change CRLF to LF if on windows 
+  make .env and copy values in readme
+  make venv and run pytest
+  

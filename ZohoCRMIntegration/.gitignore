@@ -1,0 +1,6 @@
+myenv/
+.pytest_cache/
+__pycache__/
+.env
+database_design.md 
+notes.md
