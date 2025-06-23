@@ -21,7 +21,7 @@ router = APIRouter(prefix="/data")
 async def get_data(userid: int, request: Request):
     redis_client = request.app.state.redis
     try:
-        tokens = await get_token(userid, redis_client)
+        tokens = await get_token(userid, redis_client, request)
         # if tokens in list
         if not isinstance(tokens, list):
             raise HTTPException(500, "Unexpected token format received")

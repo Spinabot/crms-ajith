@@ -21,7 +21,7 @@ router = APIRouter(prefix="/client")
 async def create_client(userid: int, request: Request, data: ClientCreateData = Body(...)):
     redis_client = request.app.state.redis
     try:
-        token_data = await get_token(userid, redis_client)
+        token_data = await get_token(userid, redis_client, request)
 
     except Exception as e:
         raise HTTPException(500, f"Error fetching token_data: {str(e)}")
