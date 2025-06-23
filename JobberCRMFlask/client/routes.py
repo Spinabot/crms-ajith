@@ -3,6 +3,7 @@ import logging
 import redis
 from flask import Blueprint, request, jsonify
 from functools import wraps
+from flasgger import swag_from
 
 from config import Config
 from queries.create_client_query import create_client_mutation
@@ -55,6 +56,133 @@ def rate_limit(max_requests=5, window=60):
 
 @client_bp.route('/create/<int:userid>', methods=['POST'])
 @rate_limit(max_requests=5, window=60)
+@swag_from({
+    'tags': ['Client Management'],
+    'summary': 'Create a new client in Jobber',
+    'description': 'Creates a new client in the Jobber CRM system using GraphQL mutation.',
+    'parameters': [
+        {
+            'name': 'userid',
+            'in': 'path',
+            'type': 'integer',
+            'required': True,
+            'description': 'User ID for authentication'
+        },
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'firstName': {'type': 'string', 'description': 'Client first name'},
+                    'lastName': {'type': 'string', 'description': 'Client last name'},
+                    'companyName': {'type': 'string', 'description': 'Company name'},
+                    'emails': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'address': {'type': 'string', 'description': 'Email address'},
+                                'primary': {'type': 'boolean', 'description': 'Whether this is the primary email'}
+                            }
+                        },
+                        'description': 'List of email addresses'
+                    },
+                    'phones': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'number': {'type': 'string', 'description': 'Phone number'},
+                                'primary': {'type': 'boolean', 'description': 'Whether this is the primary phone'}
+                            }
+                        },
+                        'description': 'List of phone numbers'
+                    },
+                    'billingAddress': {
+                        'type': 'object',
+                        'properties': {
+                            'street1': {'type': 'string', 'description': 'Primary street address'},
+                            'street2': {'type': 'string', 'description': 'Secondary street address'},
+                            'city': {'type': 'string', 'description': 'City'},
+                            'province': {'type': 'string', 'description': 'State/Province'},
+                            'country': {'type': 'string', 'description': 'Country'},
+                            'postalCode': {'type': 'string', 'description': 'Postal/ZIP code'}
+                        },
+                        'description': 'Billing address information'
+                    }
+                },
+                'example': {
+                    'firstName': 'aLLEN  ',
+                    'lastName': 'wORKS',
+                    'companyName': 'WonderTech Inc',
+                    'emails': [
+                        {
+                            'address': 'alice.johnson@wondertech.com',
+                            'primary': True
+                        }
+                    ],
+                    'phones': [
+                        {
+                            'number': '+19876543210',
+                            'primary': True
+                        }
+                    ],
+                    'billingAddress': {
+                        'street1': '42 Rainbow Road',
+                        'street2': 'Building B',
+                        'city': 'San Francisco',
+                        'province': 'CA',
+                        'country': 'USA',
+                        'postalCode': '94107'
+                    }
+                }
+            }
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Client created successfully',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'data': {'type': 'object'}
+                }
+            }
+        },
+        400: {
+            'description': 'Bad request - validation error',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        401: {
+            'description': 'Unauthorized - no token available',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        429: {
+            'description': 'Rate limit exceeded'
+        },
+        500: {
+            'description': 'Internal server error or Jobber API error',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def create_client(userid):
     """Create a new client in Jobber (converted from FastAPI implementation)."""
     try:
@@ -152,6 +280,161 @@ def create_client(userid):
 
 @client_bp.route('/update/<int:userid>', methods=['POST'])
 @rate_limit(max_requests=5, window=60)
+@swag_from({
+    'tags': ['Client Management'],
+    'summary': 'Update an existing client in Jobber',
+    'description': 'Updates an existing client in the Jobber CRM system using GraphQL mutation.',
+    'parameters': [
+        {
+            'name': 'userid',
+            'in': 'path',
+            'type': 'integer',
+            'required': True,
+            'description': 'User ID for authentication'
+        },
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'clientId': {'type': 'string', 'required': True, 'description': 'Jobber client ID'},
+                    'firstName': {'type': 'string', 'description': 'Client first name'},
+                    'lastName': {'type': 'string', 'description': 'Client last name'},
+                    'companyName': {'type': 'string', 'description': 'Company name'},
+                    'emailsToAdd': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'address': {'type': 'string', 'description': 'Email address'},
+                                'description': {'type': 'string', 'description': 'Email description (e.g., MAIN, PERSONAL)'}
+                            }
+                        },
+                        'description': 'New email addresses to add'
+                    },
+                    'phonesToAdd': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'number': {'type': 'string', 'description': 'Phone number'},
+                                'description': {'type': 'string', 'description': 'Phone description (e.g., MOBILE, WORK)'}
+                            }
+                        },
+                        'description': 'New phone numbers to add'
+                    },
+                    'emailsToEdit': {
+                        'type': 'array',
+                        'items': {'type': 'object'},
+                        'description': 'Email addresses to edit'
+                    },
+                    'phonesToEdit': {
+                        'type': 'array',
+                        'items': {'type': 'object'},
+                        'description': 'Phone numbers to edit'
+                    },
+                    'billingAddress': {
+                        'type': 'object',
+                        'properties': {
+                            'street1': {'type': 'string', 'description': 'Primary street address'},
+                            'street2': {'type': 'string', 'description': 'Secondary street address'},
+                            'city': {'type': 'string', 'description': 'City'},
+                            'province': {'type': 'string', 'description': 'State/Province'},
+                            'country': {'type': 'string', 'description': 'Country'},
+                            'postalCode': {'type': 'string', 'description': 'Postal/ZIP code'}
+                        },
+                        'description': 'Billing address information'
+                    },
+                    'phonesToDelete': {
+                        'type': 'array',
+                        'items': {'type': 'string'},
+                        'description': 'Phone IDs to delete'
+                    },
+                    'emailsToDelete': {
+                        'type': 'array',
+                        'items': {'type': 'string'},
+                        'description': 'Email IDs to delete'
+                    }
+                },
+                'example': {
+                    'clientId': 'Z2lkOi8vSm9iYmVyL0NsaWVudC8xMTEyOTY3NDk=',
+                    'firstName': 'Allen',
+                    'lastName': 'Works',
+                    'companyName': 'WonderTech Solutions',
+                    'emailsToAdd': [
+                        {
+                            'address': 'allen.works@wondertech.com',
+                            'description': 'MAIN'
+                        },
+                        {
+                            'address': 'allen@personal.com',
+                            'description': 'PERSONAL'
+                        }
+                    ],
+                    'phonesToAdd': [
+                        {
+                            'number': '+1555123456',
+                            'description': 'MOBILE'
+                        },
+                        {
+                            'number': '+1555987654',
+                            'description': 'WORK'
+                        }
+                    ],
+                    'billingAddress': {
+                        'city': 'Los Angeles',
+                        'country': 'US',
+                        'postalCode': '90210'
+                    }
+                }
+            }
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Client updated successfully',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'data': {'type': 'object'}
+                }
+            }
+        },
+        400: {
+            'description': 'Bad request - validation error or user errors',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'},
+                    'userErrors': {'type': 'array'}
+                }
+            }
+        },
+        401: {
+            'description': 'Unauthorized - no token available',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        429: {
+            'description': 'Rate limit exceeded'
+        },
+        500: {
+            'description': 'Internal server error or Jobber API error',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def update_client(userid):
     """Update an existing client in Jobber (converted from FastAPI implementation)."""
     try:
@@ -256,6 +539,91 @@ def update_client(userid):
 
 @client_bp.route('/archive/<int:userid>', methods=['POST'])
 @rate_limit(max_requests=5, window=60)
+@swag_from({
+    'tags': ['Client Management'],
+    'summary': 'Archive an existing client in Jobber',
+    'description': 'Archives (soft deletes) an existing client in the Jobber CRM system using GraphQL mutation.',
+    'parameters': [
+        {
+            'name': 'userid',
+            'in': 'path',
+            'type': 'integer',
+            'required': True,
+            'description': 'User ID for authentication'
+        },
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'clientId': {'type': 'string', 'required': True, 'description': 'Jobber client ID to archive'}
+                }
+            }
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Client archived successfully',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'data': {
+                        'type': 'object',
+                        'properties': {
+                            'clientArchive': {
+                                'type': 'object',
+                                'properties': {
+                                    'client': {
+                                        'type': 'object',
+                                        'properties': {
+                                            'id': {'type': 'string'},
+                                            'firstName': {'type': 'string'},
+                                            'lastName': {'type': 'string'},
+                                            'companyName': {'type': 'string'}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            'description': 'Bad request - validation error or user errors',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'},
+                    'userErrors': {'type': 'array'}
+                }
+            }
+        },
+        401: {
+            'description': 'Unauthorized - no token available',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        429: {
+            'description': 'Rate limit exceeded'
+        },
+        500: {
+            'description': 'Internal server error or Jobber API error',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def archive_client(userid):
     """Archive an existing client in Jobber (converted from FastAPI implementation)."""
     try:

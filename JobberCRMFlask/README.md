@@ -2,6 +2,15 @@
 
 A Flask application with PostgreSQL and Redis integration using Docker containers, featuring Jobber OAuth authentication, client management, and data retrieval.
 
+## Features
+
+- **OAuth Authentication**: Secure authentication with Jobber API
+- **Client Management**: Create, update, and archive clients
+- **Data Retrieval**: Fetch client data with pagination support
+- **Rate Limiting**: Built-in rate limiting using Redis
+- **Token Management**: Automatic token refresh and caching
+- **Swagger Documentation**: Interactive API documentation
+
 ## Project Structure
 
 ```
@@ -91,27 +100,40 @@ JOBBER_API_URL=https://api.getjobber.com/api/graphql
    docker-compose logs flask_app
    ```
 
-## API Endpoints
+## API Documentation
 
-### Basic Endpoints
+### Swagger UI
 
-- `GET /` - Returns "Hello World" message
-- `GET /health` - Health check endpoint
+Once the application is running, you can access the interactive API documentation at:
 
-### Authentication Endpoints
+```
+http://localhost:5000/apidocs/
+```
 
-- `GET /auth/jobber?userid=<user_id>` - Initiates Jobber OAuth authorization
-- `GET /auth/callback` - Handles OAuth callback from Jobber (called automatically)
+The Swagger UI provides:
 
-### Client Management Endpoints
+- Complete API endpoint documentation
+- Request/response schemas
+- Interactive testing interface
+- Authentication information
+- Rate limiting details
 
-- `POST /client/create/<userid>` - Create a new client in Jobber
-- `POST /client/update/<userid>` - Update an existing client in Jobber
-- `POST /client/archive/<userid>` - Archive an existing client in Jobber
+### API Endpoints
 
-### Data Retrieval Endpoints
+#### Authentication
 
-- `POST /data/jobber/<userid>` - Retrieve all client data from Jobber
+- `GET /auth/jobber?userid=<userid>` - Initiate OAuth flow
+- `GET /auth/callback` - Handle OAuth callback
+
+#### Client Management
+
+- `POST /client/create/<userid>` - Create a new client
+- `POST /client/update/<userid>` - Update an existing client
+- `POST /client/archive/<userid>` - Archive a client
+
+#### Data Retrieval
+
+- `POST /data/jobber/<userid>` - Get all client data
 
 ## Services
 

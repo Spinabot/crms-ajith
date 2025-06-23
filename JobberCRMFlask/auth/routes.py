@@ -6,6 +6,7 @@ from flask import Blueprint, request, redirect, url_for, jsonify, current_app
 from functools import wraps
 import redis
 import logging
+from flasgger import swag_from
 
 from config import Config
 from utils.db_conn import insert_jobber
@@ -61,6 +62,40 @@ def rate_limit(max_requests=5, window=60):
 
 @auth_bp.route('/jobber')
 @rate_limit(max_requests=5, window=60)
+@swag_from({
+    'tags': ['Authentication'],
+    'summary': 'Authorize user with Jobber OAuth',
+    'description': 'Initiates OAuth flow with Jobber API. Redirects user to Jobber authorization page.',
+    'parameters': [
+        {
+            'name': 'userid',
+            'in': 'query',
+            'type': 'integer',
+            'required': True,
+            'description': 'User ID for the authorization'
+        }
+    ],
+    'responses': {
+        302: {
+            'description': 'Redirect to Jobber authorization page'
+        },
+        400: {
+            'description': 'Bad request - missing or invalid userid',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        429: {
+            'description': 'Rate limit exceeded'
+        },
+        500: {
+            'description': 'Internal server error'
+        }
+    }
+})
 def authorize():
     """Authorize user with Jobber OAuth (matching FastAPI implementation)."""
     global REDIRECT_URI
@@ -108,6 +143,75 @@ def authorize():
         return jsonify({"error": "Authorization failed"}), 500
 
 @auth_bp.route('/callback')
+@swag_from({
+    'tags': ['Authentication'],
+    'summary': 'Handle OAuth callback from Jobber',
+    'description': 'Processes the OAuth callback from Jobber, exchanges authorization code for access tokens, and stores them in the database.',
+    'parameters': [
+        {
+            'name': 'code',
+            'in': 'query',
+            'type': 'string',
+            'required': True,
+            'description': 'Authorization code from Jobber'
+        },
+        {
+            'name': 'state',
+            'in': 'query',
+            'type': 'string',
+            'required': True,
+            'description': 'State parameter containing user ID'
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Authorization successful',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'status': {'type': 'string', 'example': 'success'},
+                    'message': {'type': 'string', 'example': 'Authorization successful'}
+                }
+            }
+        },
+        400: {
+            'description': 'Bad request - missing code or state, or invalid credentials',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        401: {
+            'description': 'Unauthorized - invalid credentials',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        403: {
+            'description': 'Forbidden - access denied',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        500: {
+            'description': 'Internal server error',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def get_callback():
     """Handle OAuth callback from Jobber (matching FastAPI implementation)."""
     global REDIRECT_URI

@@ -4,6 +4,7 @@ import time
 from flask import Blueprint, request, jsonify
 from functools import wraps
 import redis
+from flasgger import swag_from
 
 from config import Config
 from queries.get_client_query import get_client_data
@@ -53,6 +54,64 @@ def rate_limit(max_requests=5, window=60):
 
 @data_bp.route('/jobber/<int:userid>', methods=['POST'])
 @rate_limit(max_requests=5, window=60)
+@swag_from({
+    'tags': ['Data Retrieval'],
+    'summary': 'Get client data from Jobber',
+    'description': 'Retrieves all client data from Jobber CRM system using GraphQL queries with pagination support.',
+    'parameters': [
+        {
+            'name': 'userid',
+            'in': 'path',
+            'type': 'integer',
+            'required': True,
+            'description': 'User ID for authentication'
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Client data retrieved successfully',
+            'schema': {
+                'type': 'array',
+                'items': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'id': {'type': 'string'},
+                            'firstName': {'type': 'string'},
+                            'lastName': {'type': 'string'},
+                            'companyName': {'type': 'string'},
+                            'emails': {'type': 'array'},
+                            'phones': {'type': 'array'},
+                            'billingAddress': {'type': 'object'}
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            'description': 'Unauthorized - no token available',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        429: {
+            'description': 'Rate limit exceeded'
+        },
+        500: {
+            'description': 'Internal server error or GraphQL error',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def get_data(userid):
     """Get client data from Jobber (converted from FastAPI implementation)."""
     try:
