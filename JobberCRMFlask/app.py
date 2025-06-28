@@ -88,15 +88,6 @@ from config import Config
 if not Config.Remodel_ID or not Config.Remodel_SECRET:
     raise RuntimeError("Remodel_ID and Remodel_SECRET must be set in the environment")
 
-@app.route('/')
-def hello_world():
-    """Basic hello world endpoint to test if the application is running."""
-    return jsonify({"message": "Hello World"})
-
-@app.route('/health')
-def health_check():
-    """Health check endpoint."""
-    return jsonify({"status": "healthy", "message": "Flask application is running"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

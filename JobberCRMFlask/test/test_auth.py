@@ -13,30 +13,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 BASE_URL = "http://localhost:5000"
 
-def test_health_endpoint():
-    """Test the health check endpoint."""
-    print("Testing health endpoint...")
-    try:
-        response = requests.get(f"{BASE_URL}/health")
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.json()}")
-        return response.status_code == 200
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
-
-def test_hello_endpoint():
-    """Test the hello world endpoint."""
-    print("\nTesting hello world endpoint...")
-    try:
-        response = requests.get(f"{BASE_URL}/")
-        print(f"Status: {response.status_code}")
-        print(f"Response: {response.json()}")
-        return response.status_code == 200
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
-
 def test_auth_endpoint():
     """Test the authorization endpoint (will redirect to Jobber)."""
     print("\nTesting authorization endpoint...")
