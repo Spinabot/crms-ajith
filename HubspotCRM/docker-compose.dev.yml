@@ -1,0 +1,90 @@
+# Docker Compose configuration for HubSpot CRM Development
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:13-alpine
+    container_name: hubspot_postgres_dev
+    environment:
+      POSTGRES_DB: hubspot_db
+      POSTGRES_USER: hubspot_user
+      POSTGRES_PASSWORD: hubspot_password
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - hubspot_network_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hubspot_user -d hubspot_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Flask Application (Development)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hubspot_web_dev
+    environment:
+      - FLASK_APP=app:create_app
+      - FLASK_ENV=development
+      - FLASK_DEBUG=True
+      - DB_USER=hubspot_user
+      - DB_PASSWORD=hubspot_password
+      - DB_HOST=postgres
+      - DB_NAME=hubspot_db
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - HUBSPOT_API_TOKEN=${HUBSPOT_API_TOKEN}
+      - DEFAULT_PAGE_SIZE=10
+      - MAX_PAGE_SIZE=100
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hubspot_network_dev
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    # Use the entrypoint script instead of command override
+
+  # Redis (optional, for caching)
+  redis:
+    image: redis:6-alpine
+    container_name: hubspot_redis_dev
+    ports:
+      - "6379:6379"
+    networks:
+      - hubspot_network_dev
+    volumes:
+      - redis_data_dev:/data
+    restart: unless-stopped
+
+  # pgAdmin (for database management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: hubspot_pgadmin_dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@hubspot.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - hubspot_network_dev
+    restart: unless-stopped
+
+volumes:
+  postgres_data_dev:
+    driver: local
+  redis_data_dev:
+    driver: local
+
+networks:
+  hubspot_network_dev:
+    driver: bridge
