@@ -134,7 +134,6 @@ Thumbs.db
 *.lnk
 
 # Application specific
-config.py
 secrets.py
 *.key
 *.pem
