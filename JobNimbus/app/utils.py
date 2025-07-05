@@ -1,17 +1,20 @@
 import os
-
 import requests
-
-JOBNIMBUS_API_KEY = os.getenv("JOBNIMBUS_API_KEY")
+from flask import current_app
 
 
 def jobnimbus_headers():
-    return {"Authorization": f"Bearer {JOBNIMBUS_API_KEY}", "Content-Type": "application/json"}
+    api_key = current_app.config.get('JOBNIMBUS_API_KEY') or os.getenv("JOBNIMBUS_API_KEY")
+    return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
 
 def jobnimbus_request(method, url, **kwargs):
     try:
         response = requests.request(method, url, headers=jobnimbus_headers(), **kwargs)
+        print(f"JobNimbus API Request - Method: {method}, URL: {url}, Status: {response.status_code}")
+        print(f"Response Headers: {dict(response.headers)}")
+        print(f"Response Text: {response.text[:500]}...")  # Print first 500 chars for debugging
+        
         try:
             data = response.json()
         except ValueError:

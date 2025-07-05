@@ -3,10 +3,11 @@ import os
 
 class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL", "postgresql://postgres:admin@localhost:5432/postgres"
+        "DATABASE_URL", "postgresql://rithanyachandran@localhost:5432/postgres"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = False
+    JOBNIMBUS_API_KEY = os.getenv("JOBNIMBUS_API_KEY")
 
 
 # Local Development

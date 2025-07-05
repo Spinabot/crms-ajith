@@ -6,7 +6,7 @@ class Contact(db.Model):
 
     # id = db.Column(db.Integer, primary_key=True)
     jnid = db.Column(db.String, primary_key=True)
-    recid = db.Column(db.Integer, unique=True)
+    recid = db.Column(db.Integer)
 
     # Basic info
     first_name = db.Column(db.String(255))
@@ -21,7 +21,7 @@ class Contact(db.Model):
     status_name = db.Column(db.String(50), nullable=False)
 
     # Optional fields
-    customer = db.Column(db.Boolean)
+    customer = db.Column(db.String(255))
     type = db.Column(db.String(50))
     external_id = db.Column(db.String(255))
     class_id = db.Column(db.String(255))
