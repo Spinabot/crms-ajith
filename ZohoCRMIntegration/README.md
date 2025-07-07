@@ -16,12 +16,14 @@ This repository contains the codebase for integrating with Zoho CRM to perform C
 ## Initial Setup
 
 ### 1. Clone the Repository
+
 ```bash
 git clone <repository-url>
 cd ZohoCRMIntegration
 ```
 
 ### 2. Build and Run the Docker Container
+
 ```bash
 docker-compose -f docker-compose.yml up --build
 ```
@@ -36,13 +38,10 @@ docker-compose -f docker-compose.yml up --build
 
 ---
 
-
-
 2. Run the Application Using Docker
-Ensure Docker and Docker Compose are installed on your system. Then, run:
+   Ensure Docker and Docker Compose are installed on your system. Then, run:
 
 http://127.0.0.1:5000/apidocs
-
 
 Available Features
 CRUD Operations on Leads
@@ -51,12 +50,14 @@ Read: Fetch leads from Zoho CRM.
 Update: Modify existing leads in Zoho CRM.
 Delete: Remove leads from Zoho CRM.
 
-Before you set spin the docker file first put this data into the .env file for local testing. 
-# Environment Variables 
+Before you set spin the docker file first put this data into the .env file for local testing.
+
+# Environment Variables
+
 ZOHO_CLIENT_ID="1000.ZFFAMTD7HGQRKRORIPDDOHQ7CKZ1IL"
 ZOHO_CLIENT_SECRET="bf49130c11e3b0072d49e74bf27029a8cde5cb4193"
 DATABASE_NAME = ZOHO
-DB_USER  = postgres
+DB_USER = postgres
 DB_PASSWORD = root
 CONNECTION_NAME = postgres
 CACHE_REDIS_HOST = redis
@@ -66,7 +67,6 @@ CACHE_REDIS_USERNAME = redis
 GUNICORN_WORKERS = 4
 GUNICORN_BIND = 0.0.0.0:5000
 GUNICORN_WORKER_CLASS = gthread
-
 
 # Start the Application:
 
@@ -78,15 +78,10 @@ Test the API:
 
 Use the Swagger documentation at /apidocs to test the API endpoints.
 
-
-
-
-
-
-
 ## `create_db.py`
 
 ### Description
+
 The `create_db.py` script is responsible for setting up the database by creating the required tables and inserting initial test data. This script is typically used during development or testing to ensure the database is properly initialized.
 
 ---
@@ -94,9 +89,11 @@ The `create_db.py` script is responsible for setting up the database by creating
 ### Key Features
 
 1. **Table Creation**:
+
    - Creates all necessary tables in the database using the `create_tables()` function from `database.schemas`.
 
 2. **Test Data Insertion**:
+
    - Adds a test credential (`entity_id=1`) to the `ZohoCreds` table if it doesn't already exist.
    - Adds a test client (`entity_id=1`) to the `Clients` table if it doesn't already exist.
 
@@ -109,12 +106,15 @@ The `create_db.py` script is responsible for setting up the database by creating
 ### How It Works
 
 1. **App Context**:
+
    - The script runs within the Flask app context to access the database models and perform operations.
 
 2. **Table Creation**:
+
    - Calls the `create_tables()` function to create all tables defined in `database.schemas`.
 
 3. **Credential Check**:
+
    - Checks if a credential with `entity_id=1` already exists in the `ZohoCreds` table.
    - If not, inserts a test credential with a dummy access token and refresh token.
 
@@ -124,8 +124,8 @@ The `create_db.py` script is responsible for setting up the database by creating
 
 ---
 
-
 # Notes for Developers
+
 Rate Limiting:
 
 All endpoints are rate-limited to 5 requests per minute to prevent abuse.
