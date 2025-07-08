@@ -7,6 +7,7 @@ from app import db
 from app.models import ZohoCreds, ZohoClients
 from app.config import Config
 from app.swagger import api, zoho_ns, zoho_leads_response_model, zoho_users_response_model, zoho_metadata_response_model, zoho_auth_success_model, zoho_auth_error_model, zoho_create_lead_model, error_model
+from app.services.zoho_service import make_zoho_api_request
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -190,73 +191,45 @@ class ZohoLeadsResource(Resource):
         })
     def get(self, entity_id):
         """Fetch leads from Zoho CRM."""
-        try:
-            # Get Zoho credentials for the entity
-            from app.services.zoho_service import get_zoho_credentials
-            creds = get_zoho_credentials(entity_id)
+        params = dict(request.args)
+        result = make_zoho_api_request(entity_id, 'Leads', method='GET', params=params)
+        return result, 200 if 'error' not in result else 400
 
-            if creds.get("error"):
-                return creds, 401
+    @zoho_ns.doc('create_zoho_leads',
+        description='Create leads in Zoho CRM',
+        body=zoho_create_lead_model,
+        responses={
+            201: ('Created', zoho_leads_response_model),
+            400: ('Bad Request', error_model),
+            401: ('Unauthorized', zoho_auth_error_model),
+            500: ('Internal Server Error', error_model),
+            502: ('Bad Gateway', error_model)
+        })
+    def post(self, entity_id):
+        """Create leads in Zoho CRM."""
+        data = request.get_json()
+        result = make_zoho_api_request(entity_id, 'Leads', method='POST', data=data)
+        return result, 201 if 'error' not in result else 400
 
-            access_token = creds.get("access_token")
-            if not access_token:
-                return {"error": "Access token not found"}, 401
+@zoho_ns.route('/<int:entity_id>/leads/<string:lead_id>')
+@zoho_ns.param('entity_id', 'Entity ID used to fetch access token and Zoho leads')
+@zoho_ns.param('lead_id', 'Zoho Lead ID')
+class ZohoLeadResource(Resource):
+    @zoho_ns.doc('get_zoho_lead', description='Get a single lead from Zoho CRM')
+    def get(self, entity_id, lead_id):
+        result = make_zoho_api_request(entity_id, f'Leads/{lead_id}', method='GET')
+        return result, 200 if 'error' not in result else 400
 
-        except Exception as e:
-            logger.error(f"Error fetching access token: {e}")
-            return {"error": "Error while fetching access token", "details": str(e)}, 500
+    @zoho_ns.doc('update_zoho_lead', description='Update a lead in Zoho CRM', body=zoho_create_lead_model)
+    def put(self, entity_id, lead_id):
+        data = request.get_json()
+        result = make_zoho_api_request(entity_id, f'Leads/{lead_id}', method='PUT', data=data)
+        return result, 200 if 'error' not in result else 400
 
-        # Zoho API constants
-        ZOHO_QUERY_PARAMS = (
-            "fields=First_Name,Last_Name,Company,Lead_Source,Lead_Status,Industry,"
-            "Annual_Revenue,Phone,Mobile,Email,Secondary_Email,Skype_ID,Website,Rating,"
-            "No_of_Employees,Email_Opt_out,Street,City,State,Zip_Code,Country,Created_By,"
-            "Modified_By,Created_Time,Modified_Time,Owner,Lead_Owner,Twitter,Secondary_URL,"
-            "Address&sort_by=Created_Time&sort_order=desc&per_page=200&page=1"
-        )
-        ZOHO_MODULE = "Leads"
-        ZOHO_API_URL = f"https://www.zohoapis.com/crm/v8/{ZOHO_MODULE}"
-
-        # Prepare the headers for the Zoho API request
-        headers = {"Authorization": f"Zoho-oauthtoken {access_token}"}
-        url = f"{ZOHO_API_URL}?{ZOHO_QUERY_PARAMS}"
-
-        # Check if a specific client_id is provided in the query parameters
-        if request.args.get("client_id"):
-            client_id = request.args.get("client_id")
-            url = f"{ZOHO_API_URL}/{client_id}?{ZOHO_QUERY_PARAMS}"
-
-        try:
-            logger.info(f"Making Zoho API request to: {url}")
-
-            # Make a GET request to the Zoho API
-            response = requests.get(url, headers=headers)
-
-            # Safely try parsing the JSON response
-            try:
-                data = response.json()
-            except ValueError:
-                logger.error("Invalid JSON response from Zoho")
-                return {"error": "Invalid JSON response from Zoho"}, 502
-
-            # If the response status is 200 (OK), return the data
-            if response.status_code == 200:
-                logger.info(f"Successfully fetched leads for entity {entity_id}")
-                return data
-            else:
-                logger.error(f"Zoho API request failed: {response.status_code} - {data}")
-                return {
-                    "error": "Failed to fetch clients",
-                    "status_code": response.status_code,
-                    "details": data
-                }, response.status_code
-
-        except requests.RequestException as e:
-            logger.error(f"Network error while accessing Zoho CRM: {e}")
-            return {
-                "error": "Network error while accessing Zoho CRM",
-                "details": str(e)
-            }, 500
+    @zoho_ns.doc('delete_zoho_lead', description='Delete a lead in Zoho CRM')
+    def delete(self, entity_id, lead_id):
+        result = make_zoho_api_request(entity_id, f'Leads/{lead_id}', method='DELETE')
+        return result, 200 if 'error' not in result else 400
 
 @zoho_ns.route('/<int:entity_id>/users')
 @zoho_ns.param('entity_id', 'Entity ID used to fetch access token and Zoho users')
@@ -382,111 +355,6 @@ zoho_create_lead_model = api.model('ZohoCreateLead', {
     'data': fields.List(fields.Raw, required=True, description="Array of lead objects to create"),
     'layout_id': fields.String(required=False, description="Optional layout ID")
 })
-
-@zoho_ns.route('/<int:entity_id>/leads/create')
-@zoho_ns.param('entity_id', 'Entity ID used to fetch access token and create leads')
-class ZohoCreateLeadResource(Resource):
-    @zoho_ns.doc('create_zoho_leads',
-        description='Create leads in Zoho CRM',
-        body=zoho_create_lead_model,
-        responses={
-            200: ('Success', zoho_leads_response_model),
-            201: ('Created', zoho_leads_response_model),
-            400: ('Bad Request', error_model),
-            401: ('Unauthorized', zoho_auth_error_model),
-            500: ('Internal Server Error', error_model),
-            502: ('Bad Gateway', error_model)
-        })
-    def post(self, entity_id):
-        """Create leads in Zoho CRM."""
-        try:
-            # Zoho API URL
-            zoho_url = "https://www.zohoapis.com/crm/v8/Leads"
-
-            # Parse the JSON body from the request
-            try:
-                request_body = request.get_json(force=True)
-            except Exception:
-                return {"error": "Invalid JSON body"}, 400
-
-            # Extract leads data and optional layout ID from the request body
-            leads = request_body.get("data", [])
-            layout_id = request_body.get("layout_id")  # Optional layout ID
-
-            # Validate that leads data is provided
-            if not leads:
-                return {"error": "No leads provided"}, 400
-
-            # Get Zoho credentials for the entity
-            from app.services.zoho_service import get_zoho_credentials
-            creds = get_zoho_credentials(entity_id)
-
-            if creds.get("error"):
-                return creds, 401
-
-            access_token = creds.get("access_token")
-            if not access_token:
-                return {"error": "Invalid or missing access token"}, 401
-
-            # Process each lead to ensure required fields are present
-            processed_leads = []
-            for lead in leads:
-                # Define required fields for each lead
-                required_fields = ["First_Name", "Last_Name", "Company", "Email", "Phone"]
-                missing_fields = [field for field in required_fields if not lead.get(field)]
-                if missing_fields:
-                    return {"error": f"Each lead must include {', '.join(missing_fields)}"}, 400
-
-                # Add layout ID if provided
-                if layout_id:
-                    lead["Layout"] = {"id": layout_id}
-
-                # Remove any fields with None values
-                clean_lead = {k: v for k, v in lead.items() if v is not None}
-                processed_leads.append(clean_lead)
-
-            # Prepare the payload for the Zoho API request
-            payload = {
-                "data": processed_leads,
-                "trigger": ["workflow", "approval"]  # Trigger workflows and approvals in Zoho
-            }
-
-            # Set the headers for the Zoho API request
-            headers = {
-                "Authorization": f"Zoho-oauthtoken {access_token}",
-                "Content-Type": "application/json"
-            }
-
-            logger.info(f"Creating {len(processed_leads)} leads for entity {entity_id}")
-
-            # Send the POST request to Zoho API
-            try:
-                response = requests.post(zoho_url, json=payload, headers=headers)
-            except requests.RequestException as e:
-                return {"error": "Request to Zoho failed", "details": str(e)}, 502
-
-            # Parse the response from Zoho API
-            try:
-                response_data = response.json()
-            except ValueError:
-                return {"error": "Invalid JSON response from Zoho"}, 502
-
-            # Handle successful responses (200 or 201)
-            if response.status_code in [200, 201]:
-                logger.info(f"Successfully created leads for entity {entity_id}")
-                return response_data, response.status_code
-            else:
-                # Handle errors from Zoho API
-                logger.error(f"Zoho API create request failed: {response.status_code} - {response_data}")
-                return {
-                    "error": "Zoho API request failed",
-                    "status_code": response.status_code,
-                    "details": response_data
-                }, response.status_code
-
-        except Exception as e:
-            logger.error(f"Server error creating leads: {e}")
-            return {"error": "Server error", "details": str(e)}, 500
 
 @zoho_ns.route('/<int:entity_id>/leads/update')
 @zoho_ns.param('entity_id', 'Entity ID used to fetch access token and update leads')
