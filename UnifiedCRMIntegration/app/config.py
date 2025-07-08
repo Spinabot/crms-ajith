@@ -44,7 +44,9 @@ class Config:
     # Zoho CRM Configuration
     ZOHO_CLIENT_ID = os.getenv('ZOHO_CLIENT_ID')
     ZOHO_CLIENT_SECRET = os.getenv('ZOHO_CLIENT_SECRET')
-    ZOHO_REDIRECT_URI = os.getenv('ZOHO_REDIRECT_URI')
+    ZOHO_REDIRECT_URI = os.getenv('ZOHO_REDIRECT_URI', 'http://localhost:5000/zoho/authorize/callback')
+    ZOHO_ACCOUNTS_URL = os.getenv('ZOHO_ACCOUNTS_URL', 'https://accounts.zoho.com')
+    ZOHO_API_DOMAIN = os.getenv('ZOHO_API_DOMAIN', 'https://www.zohoapis.com')
 
     # Redis Configuration
     CACHE_TYPE = "RedisCache"

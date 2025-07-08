@@ -23,6 +23,8 @@ def create_app(config_class=Config):
 
     # Register blueprints
     from app.routes.jobber_auth import jobber_auth_bp
+    from app.routes.zoho import zoho_bp
     app.register_blueprint(jobber_auth_bp)
+    app.register_blueprint(zoho_bp)
 
     return app

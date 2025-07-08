@@ -12,7 +12,7 @@ class ZohoCreds(db.Model):
     access_token = Column(String)
     refresh_token = Column(String)
     expiration_time = Column(Integer)
-    
+
     # Relationship to clients (one-to-many)
     clients = relationship("Clients", backref="credentials", cascade="all, delete-orphan")
 
@@ -38,4 +38,4 @@ class ZohoAudit(db.Model):
 
 # Function to create tables
 def create_tables():
-    db.create_all() 
+    db.create_all()

@@ -100,11 +100,6 @@ Tracks synchronization activities:
 - `GET /auth/jobber/status/{user_id}` - Check authentication status
 - `GET /auth/jobber/refresh/{user_id}` - Refresh access token
 
-### Jobber CRM Data
-
-- `GET /api/jobber/clients/{user_id}` - Get client data from Jobber (raw format)
-- `GET /api/jobber/leads?user_id={user_id}` - Get leads from Jobber (unified format)
-
 #### Jobber OAuth Flow
 
 1. **Initiate Authorization**: Call `/auth/jobber/authorize?userid=123` to start the OAuth flow
@@ -116,7 +111,7 @@ Tracks synchronization activities:
 
 #### Example Usage
 
-````bash
+```bash
 # Start OAuth flow for user 123
 curl -X GET "http://localhost:5000/auth/jobber/authorize?userid=123"
 
@@ -125,12 +120,7 @@ curl -X GET "http://localhost:5000/auth/jobber/status/123"
 
 # Refresh token if expired
 curl -X GET "http://localhost:5000/auth/jobber/refresh/123"
-
-# Get client data (raw Jobber format)
-curl -X GET "http://localhost:5000/api/jobber/clients/123"
-
-# Get leads (unified format)
-curl -X GET "http://localhost:5000/api/jobber/leads?user_id=123"
+```
 
 ### Other CRM Systems
 
@@ -143,7 +133,7 @@ Similar endpoints will be available for each CRM system as they are implemented.
    ```bash
    git clone <repository-url>
    cd UnifiedCRMIntegration
-````
+   ```
 
 2. **Create virtual environment**
 

@@ -1,4 +1,4 @@
-from database import db 
+from database import db
 
 from database.schemas import ZohoCreds
 from datetime import datetime, timezone, timedelta

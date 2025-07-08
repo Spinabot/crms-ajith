@@ -12,13 +12,23 @@ api = Api(
     Supported CRM Systems:
     - BuilderPrime CRM (Fully implemented)
     - HubSpot CRM (Fully implemented)
+    - Jobber CRM (Fully implemented)
+    - Zoho CRM (Fully implemented)
 
     Operations:
-    - Create Lead: POST /api/builder-prime/leads or POST /api/hubspot/leads
-    - List Leads: GET /api/builder-prime/leads or GET /api/hubspot/leads
-    - Update Lead: PUT /api/builder-prime/leads/{lead_id} or PUT /api/hubspot/leads/{external_id}
-    - Delete Lead: DELETE /api/builder-prime/leads/{lead_id} or DELETE /api/hubspot/leads/{external_id}
-    - Sync Leads: POST /api/builder-prime/sync or POST /api/hubspot/leads/sync
+    - Create Lead: POST /api/builder-prime/leads, POST /api/hubspot/leads, POST /api/jobber/leads
+    - List Leads: GET /api/builder-prime/leads, GET /api/hubspot/leads, GET /api/jobber/clients, GET /zoho/{entity_id}/leads
+    - Update Lead: PUT /api/builder-prime/leads/{lead_id}, PUT /api/hubspot/leads/{external_id}, POST /api/jobber/clients/update
+    - Delete Lead: DELETE /api/builder-prime/leads/{lead_id}, DELETE /api/hubspot/leads/{external_id}, POST /api/jobber/clients/archive
+    - Sync Leads: POST /api/builder-prime/sync, POST /api/hubspot/leads/sync
+    - Get Users: GET /zoho/{entity_id}/users
+    - Get Metadata: GET /zoho/{entity_id}/leads/meta
+
+    Authorization:
+    - BuilderPrime: Uses API key authentication
+    - HubSpot: OAuth flow via /api/hubspot/authorize
+    - Jobber: OAuth flow via /api/jobber/authorize
+    - Zoho: OAuth flow via /zoho/{entity_id}/redirect
     ''',
     doc='/swagger',
     default='api',
@@ -80,6 +90,152 @@ leads_list_model = api.model('LeadsList', {
     'leads': fields.List(fields.Nested(lead_response_model), description='List of leads'),
 })
 
+# Jobber CRM Models
+jobber_email_model = api.model('JobberEmail', {
+    'address': fields.String(required=True, example="alice.johnson@wondertech.com", description="Email address"),
+    'primary': fields.Boolean(example=True, description="Whether this is the primary email")
+})
+
+jobber_phone_model = api.model('JobberPhone', {
+    'number': fields.String(required=True, example="+19876543210", description="Phone number"),
+    'primary': fields.Boolean(example=True, description="Whether this is the primary phone")
+})
+
+jobber_address_model = api.model('JobberAddress', {
+    'street1': fields.String(example="42 Rainbow Road", description="Primary street address"),
+    'street2': fields.String(example="Building B", description="Secondary street address"),
+    'city': fields.String(example="San Francisco", description="City"),
+    'province': fields.String(example="CA", description="State/Province"),
+    'country': fields.String(example="USA", description="Country"),
+    'postalCode': fields.String(example="94107", description="Postal/ZIP code")
+})
+
+jobber_create_client_model = api.model('JobberCreateClient', {
+    'firstName': fields.String(example="aLLEN", description="First name of the client"),
+    'lastName': fields.String(example="wORKS", description="Last name of the client"),
+    'companyName': fields.String(example="WonderTech Inc", description="Company name"),
+    'emails': fields.List(fields.Nested(jobber_email_model), description="List of email addresses"),
+    'phones': fields.List(fields.Nested(jobber_phone_model), description="List of phone numbers"),
+    'billingAddress': fields.Nested(jobber_address_model, description="Billing address information")
+})
+
+jobber_update_client_model = api.model('JobberUpdateClient', {
+    'clientId': fields.String(required=True, example="Z2lkOi8vSm9iYmVyL0NsaWVudC8xMTI3MzI5MDA=", description="Jobber client ID (Required)"),
+    'firstName': fields.String(example="Jane", description="First name of the client"),
+    'lastName': fields.String(example="Smith", description="Last name of the client"),
+    'companyName': fields.String(example="FutureTech", description="Company name"),
+    'emailsToAdd': fields.List(fields.Nested(jobber_email_model), description="New email addresses to add"),
+    'phonesToAdd': fields.List(fields.Nested(jobber_phone_model), description="New phone numbers to add"),
+    'propertyAddressesToAdd': fields.List(fields.Nested(jobber_address_model), description="New property addresses to add"),
+    'phonesToDelete': fields.List(fields.String, example=["Z2lkOi8vSm9iYmVyL0NsaWVudFBob25lTnVtYmVyLzEwNjE2NDk5Nw=="], description="Phone IDs to delete"),
+    'emailsToDelete': fields.List(fields.String, example=["Z2lkOi8vSm9iYmVyL0VtYWlsLzc4MzMyMTMx"], description="Email IDs to delete")
+})
+
+jobber_archive_client_model = api.model('JobberArchiveClient', {
+    'clientId': fields.String(required=True, example="Z2lkOi8vSm9iYmVyL0NsaWVudC8xMTI3MzI5MDA=", description="Jobber client ID to archive (Required)")
+})
+
+jobber_client_response_model = api.model('JobberClientResponse', {
+    'id': fields.String(description="Client ID"),
+    'firstName': fields.String(description="First name"),
+    'lastName': fields.String(description="Last name"),
+    'companyName': fields.String(description="Company name"),
+    'isLead': fields.Boolean(description="Whether this is a lead"),
+    'isCompany': fields.Boolean(description="Whether this is a company"),
+    'jobberWebUri': fields.String(description="Jobber web URI"),
+    'balance': fields.Float(description="Account balance"),
+    'emails': fields.List(fields.Raw, description="Email addresses"),
+    'phones': fields.List(fields.Raw, description="Phone numbers"),
+    'clientProperties': fields.Raw(description="Client properties"),
+    'sourceAttribution': fields.Raw(description="Source attribution")
+})
+
+jobber_clients_list_model = api.model('JobberClientsList', {
+    'data': fields.List(fields.Nested(jobber_client_response_model), description="List of clients"),
+    'total_count': fields.Integer(description="Total number of clients"),
+    'pages_fetched': fields.Integer(description="Number of pages fetched")
+})
+
+# Jobber Authorization Models
+jobber_auth_success_model = api.model('JobberAuthSuccess', {
+    'status': fields.String(example="success", description="Authorization status"),
+    'message': fields.String(example="Authorization successful", description="Success message")
+})
+
+jobber_auth_error_model = api.model('JobberAuthError', {
+    'error': fields.String(example="Bad Request", description="Error type"),
+    'message': fields.String(example="userid parameter is required", description="Error message")
+})
+
+# Zoho CRM Models
+zoho_lead_model = api.model('ZohoLead', {
+    'First_Name': fields.String(example="John", description="First name of the lead"),
+    'Last_Name': fields.String(example="Smith", description="Last name of the lead"),
+    'Company': fields.String(example="Tech Solutions Inc", description="Company name"),
+    'Lead_Source': fields.String(example="Website", description="Source of the lead"),
+    'Lead_Status': fields.String(example="New", description="Status of the lead"),
+    'Industry': fields.String(example="Technology", description="Industry"),
+    'Annual_Revenue': fields.Float(example=1000000.0, description="Annual revenue"),
+    'Phone': fields.String(example="+18005554444", description="Phone number"),
+    'Mobile': fields.String(example="+18005554445", description="Mobile number"),
+    'Email': fields.String(example="john.smith@example.com", description="Email address"),
+    'Secondary_Email': fields.String(example="john.smith2@example.com", description="Secondary email"),
+    'Skype_ID': fields.String(example="john.smith.skype", description="Skype ID"),
+    'Website': fields.String(example="https://example.com", description="Website URL"),
+    'Rating': fields.String(example="Hot", description="Lead rating"),
+    'No_of_Employees': fields.Integer(example=50, description="Number of employees"),
+    'Email_Opt_out': fields.Boolean(example=False, description="Email opt out status"),
+    'Street': fields.String(example="123 Main Street", description="Street address"),
+    'City': fields.String(example="Los Angeles", description="City"),
+    'State': fields.String(example="CA", description="State"),
+    'Zip_Code': fields.String(example="12345", description="ZIP code"),
+    'Country': fields.String(example="USA", description="Country"),
+    'Created_By': fields.String(description="User who created the lead"),
+    'Modified_By': fields.String(description="User who last modified the lead"),
+    'Created_Time': fields.String(description="Creation timestamp"),
+    'Modified_Time': fields.String(description="Last modification timestamp"),
+    'Owner': fields.String(description="Lead owner"),
+    'Lead_Owner': fields.String(description="Lead owner"),
+    'Twitter': fields.String(example="@johnsmith", description="Twitter handle"),
+    'Secondary_URL': fields.String(example="https://secondary.example.com", description="Secondary URL"),
+    'Address': fields.String(description="Full address")
+})
+
+zoho_leads_response_model = api.model('ZohoLeadsResponse', {
+    'data': fields.List(fields.Nested(zoho_lead_model), description="List of leads"),
+    'info': fields.Raw(description="Response metadata")
+})
+
+zoho_user_model = api.model('ZohoUser', {
+    'id': fields.String(example="6707647000000503001", description="User ID"),
+    'name': fields.String(example="John Doe", description="Full name"),
+    'email': fields.String(example="john.doe@example.com", description="Email address")
+})
+
+zoho_users_response_model = api.model('ZohoUsersResponse', {
+    'users': fields.List(fields.Nested(zoho_user_model), description="List of users")
+})
+
+zoho_metadata_response_model = api.model('ZohoMetadataResponse', {
+    'status': fields.String(example="Success", description="Response status"),
+    'data': fields.Raw(description="Metadata information")
+})
+
+zoho_auth_success_model = api.model('ZohoAuthSuccess', {
+    'status': fields.String(example="success", description="Authorization status"),
+    'message': fields.String(example="Authorization successful", description="Success message")
+})
+
+zoho_auth_error_model = api.model('ZohoAuthError', {
+    'error': fields.String(example="Unauthorized", description="Error type"),
+    'message': fields.String(example="Entity not authenticated with Zoho", description="Error message")
+})
+
+zoho_create_lead_model = api.model('ZohoCreateLead', {
+    'data': fields.List(fields.Raw, required=True, description="Array of lead objects to create"),
+    'layout_id': fields.String(required=False, description="Optional layout ID")
+})
+
 error_model = api.model('Error', {
     'error': fields.String(description='Error type'),
     'message': fields.String(description='Error message'),
@@ -118,13 +274,16 @@ pagination_model = api.model('PaginationResponse', {
 builder_prime_ns = Namespace('builder-prime', description='BuilderPrime CRM operations')
 hubspot_ns = Namespace('hubspot', description='HubSpot CRM operations')
 jobber_ns = Namespace('jobber', description='Jobber CRM operations')
+zoho_ns = Namespace('zoho', description='Zoho CRM operations')
 
 # Add namespaces to API
 api.add_namespace(builder_prime_ns)
 api.add_namespace(hubspot_ns)
 api.add_namespace(jobber_ns)
+api.add_namespace(zoho_ns)
 
 # Import routes to register them with the API
 import app.routes.builder_prime
 import app.routes.hubspot
 import app.routes.jobber
+import app.routes.zoho

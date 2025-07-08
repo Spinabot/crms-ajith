@@ -20,7 +20,7 @@ def get_zoho_creds(entity_id: int) -> dict | None:
 
 
 
-#what the get_zoho_Creds will retirn 
+#what the get_zoho_Creds will retirn
 """
 somethign like this
 {
