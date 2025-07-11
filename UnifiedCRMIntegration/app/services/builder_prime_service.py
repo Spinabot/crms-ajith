@@ -5,15 +5,25 @@ from datetime import datetime
 from app.config import Config
 from app.models import UnifiedLead, CRMConnection, SyncLog
 from app import db
+from app.services.vault_service import VaultService
 
 class BuilderPrimeService:
     """Service class for BuilderPrime CRM operations"""
 
     def __init__(self):
-        # Use API key from environment variables
-        self.api_key = Config.BUILDER_PRIME_API_KEY
+        # Try to get API key from Vault first
+        self.api_key = None
+        try:
+            vault_service = VaultService()
+            secrets = vault_service.get_all_crm_secrets()
+            self.api_key = secrets.get('BUILDER_PRIME_API_KEY')
+        except Exception as e:
+            # Log the error and fallback to config
+            import logging
+            logging.getLogger(__name__).warning(f"Could not fetch BuilderPrime API key from Vault: {e}. Falling back to config.")
+            self.api_key = Config.BUILDER_PRIME_API_KEY
         if not self.api_key:
-            raise ValueError("BuilderPrime API key not configured in environment variables")
+            raise ValueError("BuilderPrime API key not configured in Vault or environment variables")
 
     def create_lead(self, lead_data: Dict) -> Dict:
         """Create a lead in BuilderPrime CRM (local database)"""

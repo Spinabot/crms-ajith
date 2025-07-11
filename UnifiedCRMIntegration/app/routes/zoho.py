@@ -1,11 +1,12 @@
 import requests
 import time
 import logging
-from flask import Blueprint, request, redirect, session, jsonify, current_app
+from flask import Blueprint, request, redirect, session, jsonify, current_app, g
 from flask_restx import Resource, Namespace, fields
 from app import db
 from app.models import ZohoCreds, ZohoClients
 from app.config import Config
+from app.services.vault_service import VaultService
 from app.swagger import api, zoho_ns, zoho_leads_response_model, zoho_users_response_model, zoho_metadata_response_model, zoho_auth_success_model, zoho_auth_error_model, zoho_create_lead_model, error_model
 from app.services.zoho_service import make_zoho_api_request
 
@@ -14,6 +15,29 @@ logger = logging.getLogger(__name__)
 
 # Create Blueprint for Zoho routes
 zoho_bp = Blueprint('zoho', __name__, url_prefix='/zoho')
+
+def get_zoho_secrets():
+    """Fetch Zoho client ID and secret from Vault, fallback to Config."""
+    if hasattr(g, 'zoho_secrets'):
+        return g.zoho_secrets
+
+    client_id = None
+    client_secret = None
+    try:
+        vault_service = VaultService()
+        secrets = vault_service.get_all_crm_secrets()
+        client_id = secrets.get('ZOHO_CLIENT_ID')
+        client_secret = secrets.get('ZOHO_CLIENT_SECRET')
+    except Exception as e:
+        logger.warning(f"Could not fetch Zoho secrets from Vault: {e}. Falling back to config.")
+        client_id = Config.ZOHO_CLIENT_ID
+        client_secret = Config.ZOHO_CLIENT_SECRET
+
+    if not client_id or not client_secret:
+        raise RuntimeError("ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET must be set in Vault or environment")
+
+    g.zoho_secrets = (client_id, client_secret)
+    return client_id, client_secret
 
 @zoho_bp.route("/<int:entity_id>/redirect", methods=["GET"])
 def authorize(entity_id):
@@ -27,11 +51,14 @@ def authorize(entity_id):
         # Store entity_id in session for callback
         session['entity_id'] = entity_id
 
+        # Get Zoho secrets from Vault
+        client_id, _ = get_zoho_secrets()
+
         # Build authorization URL
         auth_url = (
             f"{Config.ZOHO_ACCOUNTS_URL}/oauth/v2/auth"
             "?scope=ZohoCRM.users.ALL,ZohoCRM.modules.ALL"
-            f"&client_id={Config.ZOHO_CLIENT_ID}"
+            f"&client_id={client_id}"
             "&response_type=code"
             "&access_type=offline"
             f"&redirect_uri={Config.ZOHO_REDIRECT_URI}"
@@ -58,11 +85,14 @@ def callback():
         if not code:
             return jsonify({"error": "No authorization code received"}), 400
 
+        # Get Zoho secrets from Vault
+        client_id, client_secret = get_zoho_secrets()
+
         # Exchange grant code for access token
         token_url = f"{accounts_server}/oauth/v2/token"
         data = {
-            "client_id": Config.ZOHO_CLIENT_ID,
-            "client_secret": Config.ZOHO_CLIENT_SECRET,
+            "client_id": client_id,
+            "client_secret": client_secret,
             "code": code,
             "grant_type": "authorization_code",
             "redirect_uri": Config.ZOHO_REDIRECT_URI

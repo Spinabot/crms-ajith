@@ -5,16 +5,25 @@ from datetime import datetime
 from app.config import Config
 from app.models import UnifiedLead, CRMConnection, SyncLog
 from app import db
+from app.services.vault_service import VaultService
 
 class HubspotService:
     """Service class for HubSpot CRM operations"""
 
     def __init__(self):
-        # Use API token from environment variables
-        self.api_token = Config.HUBSPOT_API_TOKEN
+        # Try to get API token from Vault first
+        self.api_token = None
+        try:
+            vault_service = VaultService()
+            secrets = vault_service.get_all_crm_secrets()
+            self.api_token = secrets.get('HUBSPOT_API_TOKEN')
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Could not fetch HubSpot API token from Vault: {e}. Falling back to config.")
+            self.api_token = Config.HUBSPOT_API_TOKEN
         self.base_url = Config.HUBSPOT_API_BASE_URL
         if not self.api_token:
-            raise ValueError("HubSpot API token not configured in environment variables")
+            raise ValueError("HubSpot API token not configured in Vault or environment variables")
 
         self.headers = {
             'Authorization': f'Bearer {self.api_token}',

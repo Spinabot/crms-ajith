@@ -1,10 +1,35 @@
 import os
 import requests
-from flask import current_app
+import logging
+from flask import current_app, g
 from app.config import Config
+from app.services.vault_service import VaultService
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+def get_jobnimbus_secrets():
+    """Fetch JobNimbus API key from Vault, fallback to Config."""
+    if hasattr(g, 'jobnimbus_secrets'):
+        return g.jobnimbus_secrets
+
+    api_key = None
+    try:
+        vault_service = VaultService()
+        secrets = vault_service.get_all_crm_secrets()
+        api_key = secrets.get('JOBNIMBUS_API_KEY')
+    except Exception as e:
+        logger.warning(f"Could not fetch JobNimbus secrets from Vault: {e}. Falling back to config.")
+        api_key = Config.JOBNIMBUS_API_KEY
+
+    if not api_key:
+        raise RuntimeError("JOBNIMBUS_API_KEY must be set in Vault or environment")
+
+    g.jobnimbus_secrets = api_key
+    return api_key
 
 def jobnimbus_headers():
-    api_key = current_app.config.get('JOBNIMBUS_API_KEY') or os.getenv("JOBNIMBUS_API_KEY")
+    api_key = get_jobnimbus_secrets()
     return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
 
@@ -22,4 +47,4 @@ def jobnimbus_request(method, endpoint, **kwargs):
             }, response.status_code
         return data, response.status_code
     except Exception as e:
-        return {"error": "Failed to contact JobNimbus", "details": str(e)}, 500 
+        return {"error": "Failed to contact JobNimbus", "details": str(e)}, 500

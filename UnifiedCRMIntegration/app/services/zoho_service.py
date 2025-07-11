@@ -1,11 +1,36 @@
 import requests
 import time
 import logging
+from flask import g
 from app import db
 from app.models import ZohoCreds
 from app.config import Config
+from app.services.vault_service import VaultService
 
 logger = logging.getLogger(__name__)
+
+def get_zoho_secrets():
+    """Fetch Zoho client ID and secret from Vault, fallback to Config."""
+    if hasattr(g, 'zoho_secrets'):
+        return g.zoho_secrets
+
+    client_id = None
+    client_secret = None
+    try:
+        vault_service = VaultService()
+        secrets = vault_service.get_all_crm_secrets()
+        client_id = secrets.get('ZOHO_CLIENT_ID')
+        client_secret = secrets.get('ZOHO_CLIENT_SECRET')
+    except Exception as e:
+        logger.warning(f"Could not fetch Zoho secrets from Vault: {e}. Falling back to config.")
+        client_id = Config.ZOHO_CLIENT_ID
+        client_secret = Config.ZOHO_CLIENT_SECRET
+
+    if not client_id or not client_secret:
+        raise RuntimeError("ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET must be set in Vault or environment")
+
+    g.zoho_secrets = (client_id, client_secret)
+    return client_id, client_secret
 
 def refresh_zoho_token(entity_id, refresh_token):
     """
@@ -22,12 +47,15 @@ def refresh_zoho_token(entity_id, refresh_token):
         return {"error": "Entity ID and refresh token are required"}
 
     try:
+        # Get Zoho secrets from Vault
+        client_id, client_secret = get_zoho_secrets()
+
         # Build refresh token URL
         url = (
             f"{Config.ZOHO_ACCOUNTS_URL}/oauth/v2/token"
             f"?refresh_token={refresh_token}"
-            f"&client_id={Config.ZOHO_CLIENT_ID}"
-            f"&client_secret={Config.ZOHO_CLIENT_SECRET}"
+            f"&client_id={client_id}"
+            f"&client_secret={client_secret}"
             "&grant_type=refresh_token"
         )
 
@@ -108,6 +136,10 @@ def get_zoho_credentials(entity_id):
 
             # Get updated credentials after refresh
             creds = ZohoCreds.query.filter_by(entity_id=entity_id).first()
+
+            # Check if creds still exists after refresh
+            if not creds:
+                return {"error": "Entity credentials not found after token refresh"}
 
         return {
             "access_token": creds.access_token,

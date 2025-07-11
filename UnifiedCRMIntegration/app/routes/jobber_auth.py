@@ -2,10 +2,11 @@ import datetime
 import jwt
 import requests
 import logging
-from flask import Blueprint, request, redirect, jsonify, current_app
+from flask import Blueprint, request, redirect, jsonify, current_app, g
 from app import db
 from app.models import JobberAuth
 from app.config import Config
+from app.services.vault_service import VaultService
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -16,9 +17,25 @@ jobber_auth_bp = Blueprint('jobber_auth', __name__, url_prefix='/auth/jobber')
 # Global variable for redirect URI
 REDIRECT_URI = None
 
-# Validate required configuration
-if not Config.JOBBER_CLIENT_ID or not Config.JOBBER_CLIENT_SECRET:
-    raise RuntimeError("JOBBER_CLIENT_ID and JOBBER_CLIENT_SECRET must be set in the environment")
+def get_jobber_secrets():
+    """Fetch Jobber client ID and secret from Vault, fallback to Config."""
+    if hasattr(g, 'jobber_secrets'):
+        return g.jobber_secrets
+    client_id = None
+    client_secret = None
+    try:
+        vault_service = VaultService()
+        secrets = vault_service.get_all_crm_secrets()
+        client_id = secrets.get('JOBBER_CLIENT_ID')
+        client_secret = secrets.get('JOBBER_CLIENT_SECRET')
+    except Exception as e:
+        logger.warning(f"Could not fetch Jobber secrets from Vault: {e}. Falling back to config.")
+        client_id = Config.JOBBER_CLIENT_ID
+        client_secret = Config.JOBBER_CLIENT_SECRET
+    if not client_id or not client_secret:
+        raise RuntimeError("JOBBER_CLIENT_ID and JOBBER_CLIENT_SECRET must be set in Vault or environment")
+    g.jobber_secrets = (client_id, client_secret)
+    return client_id, client_secret
 
 @jobber_auth_bp.route('/authorize')
 def authorize():
@@ -43,9 +60,10 @@ def authorize():
         REDIRECT_URI = f"http://{host}:{port}/auth/jobber/callback"
 
         # Build authorization URL
+        client_id, _ = get_jobber_secrets()
         auth_url = (
             f"https://api.getjobber.com/api/oauth/authorize"
-            f"?response_type=code&client_id={Config.JOBBER_CLIENT_ID}&redirect_uri={REDIRECT_URI}&state={userid_int}"
+            f"?response_type=code&client_id={client_id}&redirect_uri={REDIRECT_URI}&state={userid_int}"
         )
 
         logger.info(f"Redirecting user {userid_int} to Jobber authorization")
@@ -72,9 +90,10 @@ def get_callback():
         user_id = state  # passing userid in state params
 
         # Prepare token request data
+        client_id, client_secret = get_jobber_secrets()
         token_data = {
-            "client_id": Config.JOBBER_CLIENT_ID,
-            "client_secret": Config.JOBBER_CLIENT_SECRET,
+            "client_id": client_id,
+            "client_secret": client_secret,
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": REDIRECT_URI,
@@ -189,9 +208,10 @@ def refresh_token(user_id):
             return jsonify({"error": "User not found"}), 404
 
         # Prepare refresh token request
+        client_id, client_secret = get_jobber_secrets()
         refresh_data = {
-            "client_id": Config.JOBBER_CLIENT_ID,
-            "client_secret": Config.JOBBER_CLIENT_SECRET,
+            "client_id": client_id,
+            "client_secret": client_secret,
             "grant_type": "refresh_token",
             "refresh_token": auth_record.refresh_token,
         }

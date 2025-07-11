@@ -13,34 +13,115 @@ api = Api(
     - BuilderPrime CRM (Fully implemented)
     - HubSpot CRM (Fully implemented)
     - Jobber CRM (Fully implemented)
+    - JobNimbus CRM (Fully implemented)
     - Zoho CRM (Fully implemented)
 
     Operations:
-    - Create Lead: POST /api/builder-prime/leads, POST /api/hubspot/leads, POST /api/jobber/leads
-    - List Leads: GET /api/builder-prime/leads, GET /api/hubspot/leads, GET /api/jobber/clients, GET /zoho/{entity_id}/leads
-    - Update Lead: PUT /api/builder-prime/leads/{lead_id}, PUT /api/hubspot/leads/{external_id}, POST /api/jobber/clients/update
-    - Delete Lead: DELETE /api/builder-prime/leads/{lead_id}, DELETE /api/hubspot/leads/{external_id}, POST /api/jobber/clients/archive
+    - Create Lead: POST /api/builder-prime/leads, POST /api/hubspot/leads, POST /api/jobber/leads, POST /jobnimbus/contacts, POST /zoho/{entity_id}/leads
+    - List Leads: GET /api/builder-prime/leads, GET /api/hubspot/leads, GET /api/jobber/clients, GET /jobnimbus/contacts, GET /zoho/{entity_id}/leads
+    - Update Lead: PUT /api/builder-prime/leads/{lead_id}, PUT /api/hubspot/leads/{external_id}, POST /api/jobber/clients/update, PUT /jobnimbus/contacts/{jnid}, PUT /zoho/{entity_id}/leads/{lead_id}
+    - Delete Lead: DELETE /api/builder-prime/leads/{lead_id}, DELETE /api/hubspot/leads/{external_id}, POST /api/jobber/clients/archive, DELETE /jobnimbus/contacts/{jnid}, DELETE /zoho/{entity_id}/leads/{lead_id}
     - Sync Leads: POST /api/builder-prime/sync, POST /api/hubspot/leads/sync
     - Get Users: GET /zoho/{entity_id}/users
     - Get Metadata: GET /zoho/{entity_id}/leads/meta
 
+    OAuth Authorization Endpoints:
+    - Jobber Auth: GET /auth/jobber/authorize?userid={user_id}, GET /auth/jobber/status/{user_id}, POST /auth/jobber/refresh/{user_id}
+    - Zoho Auth: GET /zoho/{entity_id}/redirect, GET /zoho/{entity_id}/status, GET /zoho/{entity_id}/refresh
+
     Authorization:
-    - BuilderPrime: Uses API key authentication
-    - HubSpot: OAuth flow via /api/hubspot/authorize
-    - Jobber: OAuth flow via /api/jobber/authorize
-    - Zoho: OAuth flow via /zoho/{entity_id}/redirect
+    - BuilderPrime: Uses API key from Vault (BUILDER_PRIME_API_KEY) - No headers required
+    - HubSpot: Uses API token from Vault (HUBSPOT_API_TOKEN) - No headers required
+    - Jobber: OAuth flow via /auth/jobber/authorize?userid={user_id} (Browser-based authorization required)
+    - JobNimbus: Uses API key from Vault (JOBNIMBUS_API_KEY) - No headers required
+    - Zoho: OAuth flow via /zoho/{entity_id}/redirect (Uses ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET from Vault)
+
+    IMPORTANT - Jobber Authorization (OAuth 2.0):
+    Jobber uses OAuth 2.0 authorization code flow with browser-based authentication.
+
+    Step-by-Step Authorization Process:
+    1. Initiate Authorization: GET /auth/jobber/authorize?userid={user_id}
+       - Replace {user_id} with a unique identifier for the user (e.g., 123)
+       - This redirects to Jobber's OAuth authorization page
+       - User must log in to Jobber and grant permissions
+
+    2. Complete OAuth Flow:
+       - User is redirected to Jobber's authorization page
+       - After granting permissions, Jobber redirects back to /auth/jobber/callback
+       - The system automatically exchanges the authorization code for access/refresh tokens
+       - Tokens are stored securely in the database
+
+    3. Check Authorization Status: GET /auth/jobber/status/{user_id}
+       - Returns authentication status: "authenticated", "expired", or "not_authenticated"
+       - Includes token validity information
+
+    4. Refresh Token (if needed): POST /auth/jobber/refresh/{user_id}
+       - Automatically refreshes expired access tokens using refresh tokens
+       - No manual intervention required
+
+    Important Notes:
+    - Each user_id requires separate authorization
+    - Access tokens expire after 1 hour, refresh tokens are valid for 30 days
+    - Tokens are automatically refreshed when making API calls
+    - All Jobber API calls require a valid user_id that has been authorized
+
+    IMPORTANT - Zoho Authorization (OAuth 2.0):
+    Zoho uses OAuth 2.0 authorization code flow with entity-based authentication.
+
+    IMPORTANT - Entity ID 1 Exception:
+    For entity_id = 1, Zoho APIs work without any authorization required.
+    This is a special case for testing and development purposes.
+    All other entity IDs require the OAuth authorization flow below.
+
+    Step-by-Step Authorization Process (for entity_id > 1):
+    1. Initiate Authorization: GET /zoho/{entity_id}/redirect
+       - Replace {entity_id} with a unique identifier for the Zoho entity (e.g., 123)
+       - This redirects to Zoho's OAuth authorization page
+       - User must log in to Zoho and grant permissions
+
+    2. Complete OAuth Flow:
+       - User is redirected to Zoho's authorization page
+       - After granting permissions, Zoho redirects back to /zoho/authorize/callback
+       - The system automatically exchanges the authorization code for access/refresh tokens
+       - Tokens are stored securely in the database with the entity_id
+
+    3. Check Authorization Status: GET /zoho/{entity_id}/status
+       - Returns authentication status: "authenticated", "expired", or "not_authenticated"
+       - Includes token validity information
+
+    4. Refresh Token (if needed): GET /zoho/{entity_id}/refresh
+       - Automatically refreshes expired access tokens using refresh tokens
+       - No manual intervention required
+
+    Important Notes:
+    - Entity ID 1 works without authorization (for testing/development)
+    - Each entity_id > 1 requires separate authorization
+    - Access tokens expire after 1 hour, refresh tokens are valid for 60 days
+    - Tokens are automatically refreshed when making API calls
+    - All Zoho API calls require a valid entity_id that has been authorized
+    - Zoho supports multiple entities (organizations) per account
+
+    IMPORTANT - Vault-based Authentication:
+    BuilderPrime, HubSpot, JobNimbus, and Zoho APIs use secrets stored in HashiCorp Vault automatically.
+    No API key headers or request body parameters are required.
+    Secrets are fetched from Vault with fallback to environment variables.
+
+    OAuth Secrets in Vault:
+    - Jobber: JOBBER_CLIENT_ID, JOBBER_CLIENT_SECRET
+    - Zoho: ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET
+
+    Key Differences Between Jobber and Zoho:
+    - Jobber: User-based authentication (each user needs separate authorization)
+    - Zoho: Entity-based authentication (each organization/entity needs separate authorization)
+    - Jobber: Focused on service businesses (contractors, landscapers, etc.)
+    - Zoho: General-purpose CRM with extensive customization options
+    - Jobber: Simpler data model with clients, estimates, and invoices
+    - Zoho: Complex data model with leads, contacts, accounts, and custom modules
     ''',
     doc='/swagger',
     default='api',
-    default_label='CRM Operations',
-    authorizations={
-        'apikey': {
-            'type': 'apiKey',
-            'in': 'header',
-            'name': 'x-api-key'
-        }
-    },
-    security='apikey'
+    default_label='CRM Operations'
+    # Removed authorizations and security since no global API key is required
 )
 
 # Define detailed lead model matching BuilderPrime format
@@ -156,16 +237,7 @@ jobber_clients_list_model = api.model('JobberClientsList', {
     'pages_fetched': fields.Integer(description="Number of pages fetched")
 })
 
-# Jobber Authorization Models
-jobber_auth_success_model = api.model('JobberAuthSuccess', {
-    'status': fields.String(example="success", description="Authorization status"),
-    'message': fields.String(example="Authorization successful", description="Success message")
-})
 
-jobber_auth_error_model = api.model('JobberAuthError', {
-    'error': fields.String(example="Bad Request", description="Error type"),
-    'message': fields.String(example="userid parameter is required", description="Error message")
-})
 
 # Zoho CRM Models
 zoho_lead_model = api.model('ZohoLead', {
@@ -253,6 +325,40 @@ sync_result_model = api.model('SyncResult', {
     'errors': fields.Integer(description='Number of errors'),
 })
 
+# Vault Models
+vault_status_model = api.model('VaultStatus', {
+    'initialized': fields.Boolean(description='Whether Vault is initialized'),
+    'sealed': fields.Boolean(description='Whether Vault is sealed'),
+    'standby': fields.Boolean(description='Whether Vault is in standby mode'),
+    'performance_standby': fields.Boolean(description='Whether Vault is in performance standby mode'),
+    'version': fields.String(description='Vault version'),
+    'cluster_name': fields.String(description='Vault cluster name'),
+    'cluster_id': fields.String(description='Vault cluster ID'),
+    'error': fields.String(description='Error message if any')
+})
+
+vault_connection_model = api.model('VaultConnection', {
+    'connected': fields.Boolean(description='Whether connected to Vault'),
+    'authenticated': fields.Boolean(description='Whether authenticated with Vault'),
+    'can_read_secrets': fields.Boolean(description='Whether can read secrets'),
+    'vault_url': fields.String(description='Vault server URL'),
+    'namespace': fields.String(description='Vault namespace'),
+    'secret_path': fields.String(description='Default secret path'),
+    'error': fields.String(description='Error message if any')
+})
+
+vault_secret_model = api.model('VaultSecret', {
+    'path': fields.String(description='Secret path'),
+    'data': fields.Raw(description='Secret data'),
+    'message': fields.String(description='Response message')
+})
+
+vault_secrets_model = api.model('VaultSecrets', {
+    'secrets': fields.Raw(description='Dictionary of secrets'),
+    'count': fields.Integer(description='Number of secrets'),
+    'message': fields.String(description='Response message')
+})
+
 # Define query parameters
 get_parser = api.parser()
 get_parser.add_argument('last-modified-since', type=str, help='Filter by last modified date (milliseconds since epoch)')
@@ -275,15 +381,18 @@ builder_prime_ns = Namespace('builder-prime', description='BuilderPrime CRM oper
 hubspot_ns = Namespace('hubspot', description='HubSpot CRM operations')
 jobber_ns = Namespace('jobber', description='Jobber CRM operations')
 zoho_ns = Namespace('zoho', description='Zoho CRM operations')
+vault_ns = Namespace('vault', description='Vault operations')
 
 # Add namespaces to API
 api.add_namespace(builder_prime_ns)
 api.add_namespace(hubspot_ns)
 api.add_namespace(jobber_ns)
 api.add_namespace(zoho_ns)
+api.add_namespace(vault_ns)
 
 # Import routes to register them with the API
 import app.routes.builder_prime
 import app.routes.hubspot
 import app.routes.jobber
 import app.routes.zoho
+import app.routes.vault

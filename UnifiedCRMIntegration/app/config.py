@@ -48,6 +48,13 @@ class Config:
     ZOHO_ACCOUNTS_URL = os.getenv('ZOHO_ACCOUNTS_URL', 'https://accounts.zoho.com')
     ZOHO_API_DOMAIN = os.getenv('ZOHO_API_DOMAIN', 'https://www.zohoapis.com')
 
+    # Vault Configuration
+    VAULT_URL = os.getenv('VAULT_URL', 'http://localhost:8200')
+    VAULT_TOKEN = os.getenv('VAULT_TOKEN')
+    VAULT_NAMESPACE = os.getenv('VAULT_NAMESPACE')
+    VAULT_SECRET_PATH = os.getenv('VAULT_SECRET_PATH', 'crm-integration')
+    VAULT_MOUNT_POINT = os.getenv('VAULT_MOUNT_POINT', 'kv')
+
     # Redis Configuration
     CACHE_TYPE = "RedisCache"
     CACHE_REDIS_HOST = os.getenv("REDIS_HOST", "redis")

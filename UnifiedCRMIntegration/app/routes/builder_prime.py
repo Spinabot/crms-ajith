@@ -4,21 +4,23 @@ from app.models import UnifiedLead, CRMConnection, SyncLog
 from app import db
 from app.utils.auth import require_api_key
 from app.services.builder_prime_service import BuilderPrimeService
+from app.services.vault_service import VaultService
 from app.swagger import api, lead_model, lead_response_model, leads_list_model, success_model, sync_result_model, get_parser, builder_prime_ns
 from app.config import Config
 
 def check_builder_prime_auth():
-    """Check BuilderPrime authentication"""
-    api_key = request.headers.get('x-api-key')
-    if not api_key and request.is_json:
-        api_key = request.get_json().get('secretKey')
-
-    # Check if we have a valid API key from environment
-    if not Config.BUILDER_PRIME_API_KEY:
+    """Check BuilderPrime authentication using Vault first, then Config as fallback"""
+    api_key = None
+    try:
+        vault_service = VaultService()
+        secrets = vault_service.get_all_crm_secrets()
+        api_key = secrets.get('BUILDER_PRIME_API_KEY')
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Could not fetch BuilderPrime API key from Vault: {e}. Falling back to config.")
+        api_key = Config.BUILDER_PRIME_API_KEY
+    if not api_key:
         return {'error': 'Unauthorized', 'message': 'BuilderPrime CRM not configured'}, 401
-
-    if not api_key or api_key != Config.BUILDER_PRIME_API_KEY:
-        return {'error': 'Unauthorized', 'message': 'Invalid or missing API key'}, 401
     return None
 
 @builder_prime_ns.route('/leads')
@@ -28,7 +30,7 @@ class BuilderPrimeLeadsResource(Resource):
     @api.expect(lead_model)
     @api.response(201, 'Lead created successfully', success_model)
     @api.response(400, 'Bad Request - Missing required fields')
-    @api.response(401, 'Unauthorized - Invalid API key')
+    @api.response(401, 'Unauthorized - BuilderPrime CRM not configured')
     @api.response(415, 'Unsupported Media Type - Content-Type must be application/json')
     @api.response(500, 'Internal Server Error')
     def post(self):
@@ -85,7 +87,7 @@ class BuilderPrimeLeadsResource(Resource):
         description='Get leads from BuilderPrime CRM with optional filtering')
     @api.expect(get_parser)
     @api.response(200, 'Success', leads_list_model)
-    @api.response(401, 'Unauthorized - Invalid API key')
+    @api.response(401, 'Unauthorized - BuilderPrime CRM not configured')
     @api.response(500, 'Internal Server Error')
     def get(self):
         """Get leads from BuilderPrime CRM"""
@@ -119,7 +121,7 @@ class BuilderPrimeLeadResource(Resource):
     @api.expect(lead_model)
     @api.response(200, 'Lead updated successfully', lead_response_model)
     @api.response(400, 'Bad Request - Invalid data')
-    @api.response(401, 'Unauthorized - Invalid API key')
+    @api.response(401, 'Unauthorized - BuilderPrime CRM not configured')
     @api.response(404, 'Lead not found')
     @api.response(415, 'Unsupported Media Type - Content-Type must be application/json')
     @api.response(500, 'Internal Server Error')
@@ -182,7 +184,7 @@ class BuilderPrimeLeadResource(Resource):
     @api.doc('delete_builder_prime_lead',
         description='Delete a lead from BuilderPrime CRM')
     @api.response(200, 'Lead deleted successfully')
-    @api.response(401, 'Unauthorized - Invalid API key')
+    @api.response(401, 'Unauthorized - BuilderPrime CRM not configured')
     @api.response(404, 'Lead not found')
     @api.response(500, 'Internal Server Error')
     def delete(self, lead_id):
@@ -238,7 +240,7 @@ class BuilderPrimeSyncResource(Resource):
     @api.doc('sync_builder_prime_leads',
         description='Sync leads from BuilderPrime CRM to unified database')
     @api.response(200, 'Sync completed successfully', sync_result_model)
-    @api.response(401, 'Unauthorized - Invalid API key')
+    @api.response(401, 'Unauthorized - BuilderPrime CRM not configured')
     @api.response(500, 'Internal Server Error')
     def post(self):
         """Sync leads from BuilderPrime CRM"""
