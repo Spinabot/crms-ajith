@@ -1,9 +1,0 @@
-flask
-flask-restx
-python-dotenv
-requests
-psycopg2-binary
-flask-sqlalchemy
-python-decouple
-flask-migrate
-Werkzeug

@@ -1,0 +1,19 @@
+Flask
+Flask-SQLAlchemy
+SQLAlchemy
+Flask-Migrate
+Flask-RESTX
+jsonschema
+python-dotenv
+psycopg2-binary
+Werkzeug
+redis
+requests
+alembic
+gunicorn
+PyJWT
+hvac
+pytest
+pytest-mock
+
+# cloudSQL pg 8000

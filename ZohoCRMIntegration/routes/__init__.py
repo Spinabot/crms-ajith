@@ -1,1 +1,0 @@
-# this tells that the routes can be imported as modules from the routes package.
