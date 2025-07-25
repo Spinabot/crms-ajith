@@ -20,7 +20,7 @@ def create_app(config_class=Config):
     # Import and register Flask-RESTX API and all namespaces
     from app.swagger import api
     # Import all controllers that add namespaces to ensure registration
-    from app.controllers import jobnimbus_controller, jobber_controller, hubspot_controller, builder_prime_controller, zoho_controller
+    from app.controllers import jobnimbus_controller, jobber_controller, hubspot_controller, builder_prime_controller, zoho_controller, client_controller
     api.init_app(app)
 
     # Only register blueprints if they have non-RESTX routes

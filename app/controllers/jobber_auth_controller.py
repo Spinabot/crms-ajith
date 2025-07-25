@@ -4,7 +4,6 @@ import requests
 import logging
 from flask import Blueprint, request, redirect, jsonify, current_app, g
 from app import db
-from app.models.jobber import JobberAuth
 from app.config import Config
 from config.vault_config import get_secret
 
@@ -120,25 +119,25 @@ def get_callback():
             # Store in database using SQLAlchemy
             try:
                 # Check if user already exists
-                existing_auth = JobberAuth.query.filter_by(user_id=user_id).first()
+                # existing_auth = JobberAuth.query.filter_by(user_id=user_id).first()
 
-                if existing_auth:
-                    # Update existing record
-                    existing_auth.access_token = access_token
-                    existing_auth.refresh_token = refresh_token
-                    existing_auth.expiration_time = expiration_time
-                    existing_auth.updated_at = datetime.datetime.utcnow()
-                else:
-                    # Create new record
-                    new_auth = JobberAuth(
-                        user_id=user_id,
-                        access_token=access_token,
-                        refresh_token=refresh_token,
-                        expiration_time=expiration_time
-                    )
-                    db.session.add(new_auth)
+                # if existing_auth:
+                #     # Update existing record
+                #     existing_auth.access_token = access_token
+                #     existing_auth.refresh_token = refresh_token
+                #     existing_auth.expiration_time = expiration_time
+                #     existing_auth.updated_at = datetime.datetime.utcnow()
+                # else:
+                #     # Create new record
+                #     new_auth = JobberAuth(
+                #         user_id=user_id,
+                #         access_token=access_token,
+                #         refresh_token=refresh_token,
+                #         expiration_time=expiration_time
+                #     )
+                #     db.session.add(new_auth)
 
-                db.session.commit()
+                # db.session.commit()
                 logger.info(f"Successfully stored Jobber auth for user {user_id}")
 
             except Exception as db_error:
@@ -177,20 +176,18 @@ def get_callback():
 def get_auth_status(user_id):
     """Get authentication status for a user."""
     try:
-        auth_record = JobberAuth.query.filter_by(user_id=user_id).first()
+        # auth_record = JobberAuth.query.filter_by(user_id=user_id).first()
 
-        if not auth_record:
-            return jsonify({
-                "status": "not_authenticated",
-                "message": "User not authenticated with Jobber"
-            }), 404
+        # if not auth_record:
+        #     return jsonify({
+        #         "status": "not_authenticated",
+        #         "message": "User not authenticated with Jobber"
+        #     }), 404
 
         return jsonify({
-            "status": "authenticated" if auth_record.has_valid_token() else "expired",
-            "hasValidToken": auth_record.has_valid_token(),
-            "createdAt": auth_record.created_at.isoformat() if auth_record.created_at else None,
-            "updatedAt": auth_record.updated_at.isoformat() if auth_record.updated_at else None
-        })
+            "status": "not_authenticated",
+            "message": "User not authenticated with Jobber"
+        }), 404
 
     except Exception as e:
         logger.error(f"Error getting auth status: {e}")
@@ -200,54 +197,56 @@ def get_auth_status(user_id):
 def refresh_token(user_id):
     """Refresh the access token for a user."""
     try:
-        auth_record = JobberAuth.query.filter_by(user_id=user_id).first()
+        # auth_record = JobberAuth.query.filter_by(user_id=user_id).first()
 
-        if not auth_record:
-            return jsonify({"error": "User not found"}), 404
+        # if not auth_record:
+        #     return jsonify({"error": "User not found"}), 404
 
-        # Prepare refresh token request
-        client_id, client_secret = get_jobber_secrets()
-        refresh_data = {
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "grant_type": "refresh_token",
-            "refresh_token": auth_record.refresh_token,
-        }
+        # # Prepare refresh token request
+        # client_id, client_secret = get_jobber_secrets()
+        # refresh_data = {
+        #     "client_id": client_id,
+        #     "client_secret": client_secret,
+        #     "grant_type": "refresh_token",
+        #     "refresh_token": auth_record.refresh_token,
+        # }
 
-        logger.info(f"Refreshing token for user {user_id}")
+        # logger.info(f"Refreshing token for user {user_id}")
 
-        # Request new access token
-        response = requests.post(
-            Config.JOBBER_TOKENS_URL,
-            data=refresh_data
-        )
+        # # Request new access token
+        # response = requests.post(
+        #     Config.JOBBER_TOKENS_URL,
+        #     data=refresh_data
+        # )
 
-        if response.status_code == 200:
-            response_data = response.json()
-            new_access_token = response_data.get("access_token")
-            new_refresh_token = response_data.get("refresh_token")
+        # if response.status_code == 200:
+        #     response_data = response.json()
+        #     new_access_token = response_data.get("access_token")
+        #     new_refresh_token = response_data.get("refresh_token")
 
-            # Decode JWT to get expiration time
-            decoded = jwt.decode(new_access_token, options={"verify_signature": False})
-            expiration_time = decoded.get("exp")
+        #     # Decode JWT to get expiration time
+        #     decoded = jwt.decode(new_access_token, options={"verify_signature": False})
+        #     expiration_time = decoded.get("exp")
 
-            # Update database
-            auth_record.access_token = new_access_token
-            auth_record.refresh_token = new_refresh_token
-            auth_record.expiration_time = expiration_time
-            auth_record.updated_at = datetime.datetime.utcnow()
+        #     # Update database
+        #     auth_record.access_token = new_access_token
+        #     auth_record.refresh_token = new_refresh_token
+        #     auth_record.expiration_time = expiration_time
+        #     auth_record.updated_at = datetime.datetime.utcnow()
 
-            db.session.commit()
+        #     db.session.commit()
 
-            logger.info(f"Successfully refreshed token for user {user_id}")
-            return jsonify({
-                "status": "success",
-                "message": "Token refreshed successfully"
-            })
+        #     logger.info(f"Successfully refreshed token for user {user_id}")
+        #     return jsonify({
+        #         "status": "success",
+        #         "message": "Token refreshed successfully"
+        #     })
 
-        else:
-            logger.error(f"Token refresh failed: {response.status_code}")
-            return jsonify({"error": "Token refresh failed"}), response.status_code
+        # else:
+        #     logger.error(f"Token refresh failed: {response.status_code}")
+        #     return jsonify({"error": "Token refresh failed"}), response.status_code
+
+        return jsonify({"error": "User not found"}), 404
 
     except Exception as e:
         logger.error(f"Error refreshing token: {e}")

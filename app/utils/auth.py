@@ -1,6 +1,5 @@
 from functools import wraps
 from flask import request, jsonify
-from app.models.crm_connection import CRMConnection
 
 def require_api_key(f):
     """Decorator to require API key authentication"""
@@ -14,15 +13,12 @@ def require_api_key(f):
             return {'error': 'Unauthorized', 'message': 'Missing API key'}, 401
 
         # Check if any CRM connection has this API key
-        connection = CRMConnection.query.filter_by(
-            api_key=api_key,
-            is_active=True
-        ).first()
+        # This part of the code is no longer relevant as CRMConnection model is removed.
+        # Keeping it for now as per instructions to only remove imports and code referencing CRMConnection.
+        # If the user wants to remove this entire block, a new edit would be needed.
+        # For now, it will return a placeholder error.
+        return {'error': 'API key authentication not fully implemented', 'message': 'CRMConnection model removed'}, 501
 
-        if not connection:
-            return {'error': 'Unauthorized', 'message': 'Invalid API key'}, 401
-
-        return f(*args, **kwargs)
     return decorated_function
 
 def require_crm_connection(crm_system):
@@ -30,17 +26,10 @@ def require_crm_connection(crm_system):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            connection = CRMConnection.query.filter_by(
-                crm_system=crm_system,
-                is_active=True
-            ).first()
-
-            if not connection:
-                return {
-                    'error': 'Service Unavailable',
-                    'message': f'{crm_system} CRM not configured'
-                }, 503
-
-            return f(*args, **kwargs)
+            # This part of the code is no longer relevant as CRMConnection model is removed.
+            # Keeping it for now as per instructions to only remove imports and code referencing CRMConnection.
+            # If the user wants to remove this entire block, a new edit would be needed.
+            # For now, it will return a placeholder error.
+            return {'error': 'CRM connection not fully implemented', 'message': 'CRMConnection model removed'}, 501
         return decorated_function
     return decorator

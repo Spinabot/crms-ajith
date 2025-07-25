@@ -12,7 +12,7 @@ class Config:
     DB_USER = os.getenv('DB_USER', 'postgres')
     DB_PASSWORD = os.getenv('DB_PASSWORD', 'postgres')
     DB_HOST = os.getenv('DB_HOST', 'localhost')
-    DB_NAME = os.getenv('DB_NAME', 'leads_db')
+    DB_NAME = os.getenv('DB_NAME', 'crm_db')  # Changed default to crm_db
     DB_PORT = os.getenv('DB_PORT', '5432')
 
     SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI') or \

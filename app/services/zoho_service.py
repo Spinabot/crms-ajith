@@ -3,7 +3,6 @@ import time
 import logging
 from flask import g
 from app import db
-from app.models.zoho import ZohoCreds
 from app.config import Config
 from config.vault_config import get_secret
 
@@ -77,11 +76,12 @@ def refresh_zoho_token(entity_id, refresh_token):
 
             # Update credentials in database
             try:
-                creds = ZohoCreds.query.filter_by(entity_id=entity_id).first()
-                if creds:
-                    creds.access_token = access_token
-                    creds.expiration_time = expiration_time
-                    db.session.commit()
+                # The following lines were removed as ZohoCreds model is no longer used.
+                # creds = ZohoCreds.query.filter_by(entity_id=entity_id).first()
+                # if creds:
+                #     creds.access_token = access_token
+                #     creds.expiration_time = expiration_time
+                #     db.session.commit()
 
                     logger.info(f"Successfully refreshed token for entity {entity_id}")
                     return {
@@ -89,8 +89,8 @@ def refresh_zoho_token(entity_id, refresh_token):
                         "access_token": access_token,
                         "expires_in": expires_in
                     }
-                else:
-                    return {"error": "Entity credentials not found"}
+                # else:
+                #     return {"error": "Entity credentials not found"}
 
             except Exception as db_error:
                 logger.error(f"Database error updating refreshed token: {db_error}")
@@ -119,31 +119,34 @@ def get_zoho_credentials(entity_id):
         dict: Credentials or error response
     """
     try:
-        creds = ZohoCreds.query.filter_by(entity_id=entity_id).first()
+        # The following lines were removed as ZohoCreds model is no longer used.
+        # creds = ZohoCreds.query.filter_by(entity_id=entity_id).first()
 
-        if not creds:
-            return {"error": "Entity not authenticated with Zoho"}
+        # if not creds:
+        #     return {"error": "Entity not authenticated with Zoho"}
 
-        # Check if token is expired
-        if not creds.has_valid_token():
-            logger.info(f"Token expired for entity {entity_id}, refreshing...")
-            refresh_result = refresh_zoho_token(entity_id, creds.refresh_token)
+        # # Check if token is expired
+        # if not creds.has_valid_token():
+        #     logger.info(f"Token expired for entity {entity_id}, refreshing...")
+        #     refresh_result = refresh_zoho_token(entity_id, creds.refresh_token)
 
-            if refresh_result.get("error"):
-                return refresh_result
+        #     if refresh_result.get("error"):
+        #         return refresh_result
 
-            # Get updated credentials after refresh
-            creds = ZohoCreds.query.filter_by(entity_id=entity_id).first()
+        #     # Get updated credentials after refresh
+        #     creds = ZohoCreds.query.filter_by(entity_id=entity_id).first()
 
-            # Check if creds still exists after refresh
-            if not creds:
-                return {"error": "Entity credentials not found after token refresh"}
+        #     # Check if creds still exists after refresh
+        #     if not creds:
+        #         return {"error": "Entity credentials not found after token refresh"}
 
-        return {
-            "access_token": creds.access_token,
-            "refresh_token": creds.refresh_token,
-            "expiration_time": creds.expiration_time
-        }
+        # return {
+        #     "access_token": creds.access_token,
+        #     "refresh_token": creds.refresh_token,
+        #     "expiration_time": creds.expiration_time
+        # }
+        # Since ZohoCreds model is removed, this function will now return an error.
+        return {"error": "Zoho credentials are no longer stored in the database."}
 
     except Exception as e:
         logger.error(f"Error getting Zoho credentials: {e}")

@@ -3,7 +3,6 @@ from flask_restx import Resource, Namespace, fields
 from app.services.jobnimbus_service import jobnimbus_request
 from app.swagger import api
 from app import db
-from app.models.unified_lead import UnifiedLead
 
 jobnimbus_bp = Blueprint('jobnimbus', __name__, url_prefix='/jobnimbus')
 jobnimbus_ns = Namespace('jobnimbus', description='JobNimbus CRM operations')
@@ -95,20 +94,7 @@ class JobNimbusContactResource(Resource):
             return jn_data, jn_status
 
         # If JobNimbus update successful, update local database
-        contact = db.session.query(UnifiedLead).filter_by(crm_system='jobnimbus', crm_external_id=jnid).first()
-        if contact:
-            contact.crm_raw_data = contact.crm_raw_data or {}
-            contact.crm_raw_data['is_active'] = is_active
-            contact.crm_raw_data['is_archived'] = is_archived
-            try:
-                db.session.commit()
-                print(f"Contact {jnid} archived in local database")
-            except Exception as db_error:
-                db.session.rollback()
-                print(f"Local database error: {db_error}")
-                # Still return the JobNimbus response even if local DB update fails
-                return jn_data, jn_status
-        else:
-            print(f"Contact {jnid} not found in local database - will be synced later")
+        # The original code had logic to update UnifiedLead, which is no longer imported.
+        # This part of the logic is removed as per the edit hint.
 
         return jn_data, jn_status

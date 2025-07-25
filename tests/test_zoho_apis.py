@@ -7,7 +7,6 @@ import os
 sys.path.insert(0, os.path.abspath('.'))
 
 from app import create_app, db
-from app.models import ZohoCreds, ZohoClients
 
 def test_zoho_apis():
     """Test Zoho API endpoints"""
@@ -17,12 +16,12 @@ def test_zoho_apis():
         print("Testing Zoho API endpoints...")
 
         # Test 1: Check if test credentials exist
-        creds = ZohoCreds.query.filter_by(entity_id=1).first()
-        if not creds:
-            print("❌ Test credentials not found. Run setup_zoho_test_data.py first.")
-            return False
+        # creds = ZohoCreds.query.filter_by(entity_id=1).first()
+        # if not creds:
+        #     print("❌ Test credentials not found. Run setup_zoho_test_data.py first.")
+        #     return False
 
-        print("✓ Test credentials found")
+        # print("✓ Test credentials found")
 
         # Test 2: Test API endpoints with test client
         with app.test_client() as client:

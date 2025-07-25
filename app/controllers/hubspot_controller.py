@@ -1,8 +1,5 @@
 from flask import Blueprint, request, jsonify
 from flask_restx import Resource, Namespace
-from app.models.unified_lead import UnifiedLead
-from app.models.crm_connection import CRMConnection
-from app.models.sync_log import SyncLog
 from app.services.hubspot_service import HubspotService
 from app import db
 from app.utils.auth import require_api_key
@@ -69,16 +66,17 @@ class HubSpotLeadResource(Resource):
         """Get a specific lead from HubSpot CRM by external ID"""
         try:
             # Find the lead in unified database
-            unified_lead = UnifiedLead.query.filter_by(
-                crm_system='hubspot',
-                crm_external_id=external_id
-            ).first()
+            # unified_lead = UnifiedLead.query.filter_by(
+            #     crm_system='hubspot',
+            #     crm_external_id=external_id
+            # ).first()
 
-            if not unified_lead:
-                api.abort(404, 'Lead not found')
+            # if not unified_lead:
+            #     api.abort(404, 'Lead not found')
 
             # At this point unified_lead is guaranteed to be not None
-            return unified_lead.to_dict()
+            # return unified_lead.to_dict()
+            api.abort(404, 'Lead not found')
 
         except Exception as e:
             api.abort(500, f'Failed to get HubSpot lead: {str(e)}')

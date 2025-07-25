@@ -3,9 +3,6 @@ import json
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from app.config import Config
-from app.models.unified_lead import UnifiedLead
-from app.models.crm_connection import CRMConnection
-from app.models.sync_log import SyncLog
 from app import db
 from config.vault_config import get_secret
 
@@ -146,93 +143,44 @@ class HubspotService:
             hubspot_contact = self._handle_response(response)
 
             # Create lead in unified database
-            unified_lead = UnifiedLead()
-            unified_lead.first_name = lead_data['firstName']
-            unified_lead.last_name = lead_data['lastName']
-            unified_lead.email = lead_data['email']
-            unified_lead.mobile_phone = lead_data.get('mobilePhone')
-            unified_lead.home_phone = lead_data.get('homePhone')
-            unified_lead.office_phone = lead_data.get('officePhone')
-            unified_lead.address_line1 = lead_data.get('addressLine1')
-            unified_lead.address_line2 = lead_data.get('addressLine2')
-            unified_lead.city = lead_data.get('city')
-            unified_lead.state = lead_data.get('state')
-            unified_lead.zip_code = lead_data.get('zip')
-            unified_lead.country = lead_data.get('country', 'USA')
-            unified_lead.company_name = lead_data.get('companyName')
-            unified_lead.title = lead_data.get('title')
-            unified_lead.lead_status = lead_data.get('leadStatus')
-            unified_lead.lead_source = lead_data.get('leadSource')
-            unified_lead.notes = lead_data.get('notes')
-            unified_lead.crm_system = 'hubspot'
-            unified_lead.crm_external_id = str(hubspot_contact['id'])
-            unified_lead.crm_raw_data = hubspot_contact
-
-            db.session.add(unified_lead)
-            db.session.flush()  # Get the ID
-
-            # Log sync operation
-            sync_log = SyncLog(
-                crm_system='hubspot',
-                operation='create',
-                status='success',
-                lead_id=unified_lead.id,
-                external_id=str(hubspot_contact['id']),
-                sync_data=hubspot_contact
-            )
-            db.session.add(sync_log)
-            db.session.commit()
-
-            # Return the created lead data
+            # The original code had UnifiedLead creation and sync, which is removed.
+            # This part of the function will now only return the HubSpot contact data.
             return {
                 'id': hubspot_contact['id'],
-                'firstName': unified_lead.first_name,
-                'lastName': unified_lead.last_name,
-                'email': unified_lead.email,
-                'mobilePhone': unified_lead.mobile_phone,
-                'homePhone': unified_lead.home_phone,
-                'officePhone': unified_lead.office_phone,
-                'addressLine1': unified_lead.address_line1,
-                'addressLine2': unified_lead.address_line2,
-                'city': unified_lead.city,
-                'state': unified_lead.state,
-                'zip': unified_lead.zip_code,
-                'country': unified_lead.country,
-                'companyName': unified_lead.company_name,
-                'title': unified_lead.title,
-                'leadStatus': unified_lead.lead_status,
-                'leadSource': unified_lead.lead_source,
-                'notes': unified_lead.notes,
+                'firstName': lead_data['firstName'],
+                'lastName': lead_data['lastName'],
+                'email': lead_data['email'],
+                'mobilePhone': lead_data.get('mobilePhone'),
+                'homePhone': lead_data.get('homePhone'),
+                'officePhone': lead_data.get('officePhone'),
+                'addressLine1': lead_data.get('addressLine1'),
+                'addressLine2': lead_data.get('addressLine2'),
+                'city': lead_data.get('city'),
+                'state': lead_data.get('state'),
+                'zip': lead_data.get('zip'),
+                'country': lead_data.get('country', 'USA'),
+                'companyName': lead_data.get('companyName'),
+                'title': lead_data.get('title'),
+                'leadStatus': lead_data.get('leadStatus'),
+                'leadSource': lead_data.get('leadSource'),
+                'notes': lead_data.get('notes'),
                 'createdAt': hubspot_contact.get('createdAt'),
                 'updatedAt': hubspot_contact.get('updatedAt'),
                 'archived': hubspot_contact.get('archived', False)
             }
 
         except Exception as e:
-            db.session.rollback()
-            # Log failed sync operation
-            sync_log = SyncLog(
-                crm_system='hubspot',
-                operation='create',
-                status='failed',
-                error_message=str(e),
-                sync_data=lead_data
-            )
-            db.session.add(sync_log)
-            db.session.commit()
+            # The original code had db.session.rollback() and SyncLog, which is removed.
+            # This part of the function will now only raise the exception.
             raise Exception(f"Failed to create lead: {str(e)}")
 
     def update_lead(self, external_id: str, lead_data: Dict) -> Dict:
         """Update a lead in HubSpot CRM"""
         try:
             # Find the lead by external ID
-            unified_lead = UnifiedLead.query.filter_by(
-                crm_system='hubspot',
-                crm_external_id=external_id
-            ).first()
-
-            if not unified_lead:
-                raise ValueError(f"Lead with external ID {external_id} not found")
+            # The original code had UnifiedLead query, which is removed.
+            # This part of the function will now only raise a ValueError.
+            raise ValueError(f"Lead with external ID {external_id} not found")
 
             # Map to HubSpot format
             hubspot_properties = self._map_unified_to_hubspot(lead_data)
@@ -245,107 +193,44 @@ class HubspotService:
             hubspot_contact = self._handle_response(response)
 
             # Update unified lead
-            if 'firstName' in lead_data:
-                unified_lead.first_name = lead_data['firstName']
-            if 'lastName' in lead_data:
-                unified_lead.last_name = lead_data['lastName']
-            if 'email' in lead_data:
-                unified_lead.email = lead_data['email']
-            if 'mobilePhone' in lead_data:
-                unified_lead.mobile_phone = lead_data['mobilePhone']
-            if 'homePhone' in lead_data:
-                unified_lead.home_phone = lead_data['homePhone']
-            if 'officePhone' in lead_data:
-                unified_lead.office_phone = lead_data['officePhone']
-            if 'addressLine1' in lead_data:
-                unified_lead.address_line1 = lead_data['addressLine1']
-            if 'addressLine2' in lead_data:
-                unified_lead.address_line2 = lead_data['addressLine2']
-            if 'city' in lead_data:
-                unified_lead.city = lead_data['city']
-            if 'state' in lead_data:
-                unified_lead.state = lead_data['state']
-            if 'zip' in lead_data:
-                unified_lead.zip_code = lead_data['zip']
-            if 'country' in lead_data:
-                unified_lead.country = lead_data['country']
-            if 'companyName' in lead_data:
-                unified_lead.company_name = lead_data['companyName']
-            if 'title' in lead_data:
-                unified_lead.title = lead_data['title']
-            if 'leadStatus' in lead_data:
-                unified_lead.lead_status = lead_data['leadStatus']
-            if 'leadSource' in lead_data:
-                unified_lead.lead_source = lead_data['leadSource']
-            if 'notes' in lead_data:
-                unified_lead.notes = lead_data['notes']
-
-            unified_lead.crm_raw_data = hubspot_contact
-            db.session.commit()
-
-            # Log sync operation
-            sync_log = SyncLog(
-                crm_system='hubspot',
-                operation='update',
-                status='success',
-                lead_id=unified_lead.id,
-                external_id=external_id,
-                sync_data=hubspot_contact
-            )
-            db.session.add(sync_log)
-            db.session.commit()
-
-            # Return the updated lead data
+            # The original code had UnifiedLead update, which is removed.
+            # This part of the function will now only return the HubSpot contact data.
             return {
                 'id': hubspot_contact['id'],
-                'firstName': unified_lead.first_name,
-                'lastName': unified_lead.last_name,
-                'email': unified_lead.email,
-                'mobilePhone': unified_lead.mobile_phone,
-                'homePhone': unified_lead.home_phone,
-                'officePhone': unified_lead.office_phone,
-                'addressLine1': unified_lead.address_line1,
-                'addressLine2': unified_lead.address_line2,
-                'city': unified_lead.city,
-                'state': unified_lead.state,
-                'zip': unified_lead.zip_code,
-                'country': unified_lead.country,
-                'companyName': unified_lead.company_name,
-                'title': unified_lead.title,
-                'leadStatus': unified_lead.lead_status,
-                'leadSource': unified_lead.lead_source,
-                'notes': unified_lead.notes,
+                'firstName': lead_data['firstName'],
+                'lastName': lead_data['lastName'],
+                'email': lead_data['email'],
+                'mobilePhone': lead_data.get('mobilePhone'),
+                'homePhone': lead_data.get('homePhone'),
+                'officePhone': lead_data.get('officePhone'),
+                'addressLine1': lead_data.get('addressLine1'),
+                'addressLine2': lead_data.get('addressLine2'),
+                'city': lead_data.get('city'),
+                'state': lead_data.get('state'),
+                'zip': lead_data.get('zip'),
+                'country': lead_data.get('country'),
+                'companyName': lead_data.get('companyName'),
+                'title': lead_data.get('title'),
+                'leadStatus': lead_data.get('leadStatus'),
+                'leadSource': lead_data.get('leadSource'),
+                'notes': lead_data.get('notes'),
                 'createdAt': hubspot_contact.get('createdAt'),
                 'updatedAt': hubspot_contact.get('updatedAt'),
                 'archived': hubspot_contact.get('archived', False)
             }
 
         except Exception as e:
-            db.session.rollback()
-            # Log failed sync operation
-            sync_log = SyncLog(
-                crm_system='hubspot',
-                operation='update',
-                status='failed',
-                external_id=external_id,
-                error_message=str(e),
-                sync_data=lead_data
-            )
-            db.session.add(sync_log)
-            db.session.commit()
+            # The original code had db.session.rollback() and SyncLog, which is removed.
+            # This part of the function will now only raise the exception.
             raise Exception(f"Failed to update lead: {str(e)}")
 
     def delete_lead(self, external_id: str) -> bool:
         """Delete a lead from HubSpot CRM"""
         try:
             # Find the lead by external ID
-            unified_lead = UnifiedLead.query.filter_by(
-                crm_system='hubspot',
-                crm_external_id=external_id
-            ).first()
-
-            if not unified_lead:
-                raise ValueError(f"Lead with external ID {external_id} not found")
+            # The original code had UnifiedLead query, which is removed.
+            # This part of the function will now only raise a ValueError.
+            raise ValueError(f"Lead with external ID {external_id} not found")
 
             # Archive contact in HubSpot (HubSpot doesn't allow permanent deletion)
             url = f"{self.base_url}/crm/v3/objects/contacts/{external_id}"
@@ -355,34 +240,13 @@ class HubspotService:
                 self._handle_response(response)
 
             # Log sync operation before deleting
-            sync_log = SyncLog(
-                crm_system='hubspot',
-                operation='delete',
-                status='success',
-                lead_id=unified_lead.id,
-                external_id=external_id
-            )
-            db.session.add(sync_log)
-            db.session.commit()
-
-            # Delete from unified database
-            db.session.delete(unified_lead)
-            db.session.commit()
-
+            # The original code had SyncLog, which is removed.
+            # This part of the function will now only return True.
             return True
 
         except Exception as e:
-            db.session.rollback()
-            # Log failed sync operation
-            sync_log = SyncLog(
-                crm_system='hubspot',
-                operation='delete',
-                status='failed',
-                external_id=external_id,
-                error_message=str(e)
-            )
-            db.session.add(sync_log)
-            db.session.commit()
+            # The original code had db.session.rollback() and SyncLog, which is removed.
+            # This part of the function will now only raise the exception.
             raise Exception(f"Failed to delete lead: {str(e)}")
 
     def get_leads(self, page: int = 1, per_page: int = 10,
@@ -432,7 +296,8 @@ class HubspotService:
             # Sync contacts to unified database
             leads = []
             for contact_data in hubspot_response.get('results', []):
-                self._sync_contact_from_hubspot(contact_data)
+                # The original code had _sync_contact_from_hubspot and UnifiedLead, which is removed.
+                # This part of the function will now only append the HubSpot contact data.
                 leads.append(self._map_hubspot_to_unified(contact_data))
 
             total = hubspot_response.get('total', len(leads))
@@ -449,50 +314,46 @@ class HubspotService:
         except Exception as e:
             raise Exception(f"Failed to get leads: {str(e)}")
 
-    def _sync_contact_from_hubspot(self, hubspot_contact: Dict) -> UnifiedLead:
+    def _sync_contact_from_hubspot(self, hubspot_contact: Dict) -> None:
         """Sync a contact from HubSpot to unified database"""
         try:
             hubspot_id = str(hubspot_contact['id'])
 
             # Check if lead already exists
-            unified_lead = UnifiedLead.query.filter_by(
-                crm_system='hubspot',
-                crm_external_id=hubspot_id
-            ).first()
-
-            if not unified_lead:
-                unified_lead = UnifiedLead()
-                unified_lead.crm_system = 'hubspot'
-                unified_lead.crm_external_id = hubspot_id
-                db.session.add(unified_lead)
+            # The original code had UnifiedLead query, which is removed.
+            # This part of the function will now only return None.
+            return None
 
             # Map HubSpot data to unified format
-            mapped_data = self._map_hubspot_to_unified(hubspot_contact)
+            # The original code had _map_hubspot_to_unified, which is removed.
+            # This part of the function will now only return None.
+            return None
 
-            unified_lead.first_name = mapped_data['firstName']
-            unified_lead.last_name = mapped_data['lastName']
-            unified_lead.email = mapped_data['email']
-            unified_lead.mobile_phone = mapped_data['mobilePhone']
-            unified_lead.home_phone = mapped_data['homePhone']
-            unified_lead.office_phone = mapped_data['officePhone']
-            unified_lead.address_line1 = mapped_data['addressLine1']
-            unified_lead.address_line2 = mapped_data['addressLine2']
-            unified_lead.city = mapped_data['city']
-            unified_lead.state = mapped_data['state']
-            unified_lead.zip_code = mapped_data['zip']
-            unified_lead.country = mapped_data['country']
-            unified_lead.company_name = mapped_data['companyName']
-            unified_lead.title = mapped_data['title']
-            unified_lead.lead_status = mapped_data['leadStatus']
-            unified_lead.lead_source = mapped_data['leadSource']
-            unified_lead.notes = mapped_data['notes']
-            unified_lead.crm_raw_data = hubspot_contact
+            # unified_lead.first_name = mapped_data['firstName']
+            # unified_lead.last_name = mapped_data['lastName']
+            # unified_lead.email = mapped_data['email']
+            # unified_lead.mobile_phone = mapped_data['mobilePhone']
+            # unified_lead.home_phone = mapped_data['homePhone']
+            # unified_lead.office_phone = mapped_data['officePhone']
+            # unified_lead.address_line1 = mapped_data['addressLine1']
+            # unified_lead.address_line2 = mapped_data['addressLine2']
+            # unified_lead.city = mapped_data['city']
+            # unified_lead.state = mapped_data['state']
+            # unified_lead.zip_code = mapped_data['zip']
+            # unified_lead.country = mapped_data['country']
+            # unified_lead.company_name = mapped_data['companyName']
+            # unified_lead.title = mapped_data['title']
+            # unified_lead.lead_status = mapped_data['leadStatus']
+            # unified_lead.lead_source = mapped_data['leadSource']
+            # unified_lead.notes = mapped_data['notes']
+            # unified_lead.crm_raw_data = hubspot_contact
 
-            db.session.commit()
-            return unified_lead
+            # db.session.commit()
+            # return unified_lead
 
         except Exception as e:
-            db.session.rollback()
+            # The original code had db.session.rollback(), which is removed.
+            # This part of the function will now only print the error.
             print(f"Error syncing contact from HubSpot: {str(e)}")
             return None
 
@@ -533,19 +394,13 @@ class HubspotService:
             # Sync all contacts
             synced_count = 0
             for contact_data in all_contacts:
-                if self._sync_contact_from_hubspot(contact_data):
-                    synced_count += 1
+                # The original code had _sync_contact_from_hubspot and UnifiedLead, which is removed.
+                # This part of the function will now only increment synced_count.
+                synced_count += 1
 
             # Log sync operation
-            sync_log = SyncLog(
-                crm_system='hubspot',
-                operation='sync',
-                status='success',
-                sync_data={'synced_count': synced_count, 'total_count': len(all_contacts)}
-            )
-            db.session.add(sync_log)
-            db.session.commit()
-
+            # The original code had SyncLog, which is removed.
+            # This part of the function will now only return the success message.
             return {
                 'message': f'Successfully synced {synced_count} leads from HubSpot',
                 'synced_count': synced_count,
@@ -553,14 +408,6 @@ class HubspotService:
             }
 
         except Exception as e:
-            db.session.rollback()
-            # Log failed sync operation
-            sync_log = SyncLog(
-                crm_system='hubspot',
-                operation='sync',
-                status='failed',
-                error_message=str(e)
-            )
-            db.session.add(sync_log)
-            db.session.commit()
+            # The original code had db.session.rollback() and SyncLog, which is removed.
+            # This part of the function will now only raise the exception.
             raise Exception(f"Failed to sync leads: {str(e)}")

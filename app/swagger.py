@@ -1,6 +1,7 @@
 from flask_restx import Api, Resource, fields, Namespace
 from flask import Blueprint, request
 from app.config import Config
+from app.controllers.client_controller import client_ns
 
 # Create API instance
 api = Api(
@@ -17,13 +18,19 @@ api = Api(
     - Zoho CRM (Fully implemented)
 
     Operations:
-    - Create Lead: POST /api/builder-prime/leads, POST /api/hubspot/leads, POST /api/jobber/leads, POST /jobnimbus/contacts, POST /zoho/{entity_id}/leads
-    - List Leads: GET /api/builder-prime/leads, GET /api/hubspot/leads, GET /api/jobber/clients, GET /jobnimbus/contacts, GET /zoho/{entity_id}/leads
-    - Update Lead: PUT /api/builder-prime/leads/{lead_id}, PUT /api/hubspot/leads/{external_id}, POST /api/jobber/clients/update, PUT /jobnimbus/contacts/{jnid}, PUT /zoho/{entity_id}/leads/{lead_id}
-    - Delete Lead: DELETE /api/builder-prime/leads/{lead_id}, DELETE /api/hubspot/leads/{external_id}, POST /api/jobber/clients/archive, DELETE /jobnimbus/contacts/{jnid}, DELETE /zoho/{entity_id}/leads/{lead_id}
-    - Sync Leads: POST /api/builder-prime/sync, POST /api/hubspot/leads/sync
+    - Create Lead: POST /<client_id>/leads (BuilderPrime), POST /api/hubspot/leads, POST /api/jobber/leads, POST /jobnimbus/contacts, POST /zoho/{entity_id}/leads
+    - List Leads: GET /<client_id>/leads (BuilderPrime), GET /api/hubspot/leads, GET /api/jobber/clients, GET /jobnimbus/contacts, GET /zoho/{entity_id}/leads
+    - Update Lead: PUT /<client_id>/leads/{lead_id} (BuilderPrime), PUT /api/hubspot/leads/{external_id}, POST /api/jobber/clients/update, PUT /jobnimbus/contacts/{jnid}, PUT /zoho/{entity_id}/leads/{lead_id}
+    - Delete Lead: DELETE /<client_id>/leads/{lead_id} (BuilderPrime), DELETE /api/hubspot/leads/{external_id}, POST /api/jobber/clients/archive, DELETE /jobnimbus/contacts/{jnid}, DELETE /zoho/{entity_id}/leads/{lead_id}
+    - Sync Leads: POST /<client_id>/sync (BuilderPrime), POST /api/hubspot/leads/sync
     - Get Users: GET /zoho/{entity_id}/users
     - Get Metadata: GET /zoho/{entity_id}/leads/meta
+
+    Note: All BuilderPrime endpoints now require a client_id path parameter to access the correct API key for the client.
+
+    Client Registration:
+    - Register Client: POST /clients/ — Register a new client (company) and store their BuilderPrime and HubSpot API keys for CRM integration.
+    - Get Client: GET /clients/<client_id> — Retrieve a client by their unique client ID.
 
     OAuth Authorization Endpoints:
     - Jobber Auth: GET /auth/jobber/authorize?userid={user_id}, GET /auth/jobber/status/{user_id}, POST /auth/jobber/refresh/{user_id}
@@ -389,11 +396,13 @@ api.add_namespace(hubspot_ns)
 api.add_namespace(jobber_ns)
 api.add_namespace(zoho_ns)
 api.add_namespace(vault_ns)
+api.add_namespace(client_ns, path='/clients')
 
 # Import controllers to register them with the API
 import app.controllers.builder_prime_controller
 import app.controllers.hubspot_controller
 import app.controllers.jobber_controller
 import app.controllers.zoho_controller
+import app.controllers.client_controller
 # If you have a vault controller, update its import as well
 # import app.controllers.vault_controller
