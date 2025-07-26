@@ -1,0 +1,16 @@
+# Data Transfer Objects (DTOs) for CRM integrations
+
+# Placeholder for BuilderPrime DTOs
+# class BuilderPrimeLeadDTO: ...
+
+# Placeholder for HubSpot DTOs
+# class HubSpotLeadDTO: ...
+
+# Placeholder for Jobber DTOs
+# class JobberLeadDTO: ...
+
+# Placeholder for JobNimbus DTOs
+# class JobNimbusLeadDTO: ...
+
+# Placeholder for Zoho DTOs
+# class ZohoLeadDTO: ...
