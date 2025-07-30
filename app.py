@@ -1,54 +1,91 @@
 import os
 import sys
 import psycopg2
-from app import create_app
-from app.config import Config
-from config.vault_config import load_secrets
-from app.models.crm_db_models import CRMs, Clients, ClientCRMAuth
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from datetime import datetime
 
-def ensure_crm_db_exists():
-    db_user = os.getenv('DB_USER', 'postgres')
-    db_password = os.getenv('DB_PASSWORD', 'postgres')
-    db_host = os.getenv('DB_HOST', 'localhost')
-    db_port = os.getenv('DB_PORT', '5432')
-    db_name = os.getenv('DB_NAME', 'crm_db')
+# Import configurations
+from config.database import DatabaseConfig
+from config.flask_config import FlaskConfig
 
-    # Connect to the default 'postgres' database
-    conn = psycopg2.connect(
-        user=db_user,
-        password=db_password,
-        host=db_host,
-        port=db_port,
-        database='postgres'
-    )
-    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-    cursor = conn.cursor()
+def ensure_database_exists():
+    """Create the PostgreSQL database if it doesn't exist"""
+    try:
+        # Get database connection parameters
+        db_params = DatabaseConfig.get_connection_params()
 
-    # Check if crm_db exists
-    cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db_name,))
-    exists = cursor.fetchone()
-    if not exists:
-        print(f"📦 Creating database '{db_name}'...")
-        cursor.execute(f'CREATE DATABASE "{db_name}"')
-        print(f"✅ Database '{db_name}' created successfully!")
-    else:
-        print(f"✅ Database '{db_name}' already exists.")
+        # Connect to PostgreSQL server (not to a specific database)
+        conn = psycopg2.connect(
+            user=db_params['user'],
+            password=db_params['password'],
+            host=db_params['host'],
+            port=db_params['port'],
+            database='postgres'  # Connect to default postgres database
+        )
+        conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+        cursor = conn.cursor()
 
-    cursor.close()
-    conn.close()
+        # Check if database exists
+        cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db_params['database'],))
+        exists = cursor.fetchone()
 
-# Ensure the crm_db database exists before anything else
-ensure_crm_db_exists()
+        if not exists:
+            print(f"📦 Creating database '{db_params['database']}'...")
+            cursor.execute(f'CREATE DATABASE "{db_params["database"]}"')
+            print(f"✅ Database '{db_params['database']}' created successfully!")
+        else:
+            print(f"✅ Database '{db_params['database']}' already exists.")
 
-def initialize_crm_db(app, db):
+        cursor.close()
+        conn.close()
+        return True
+
+    except Exception as e:
+        print(f"Error creating database: {e}")
+        return False
+
+# Ensure the database exists before anything else
+ensure_database_exists()
+
+# Initialize Flask app
+app = Flask(__name__)
+
+# Configure database
+app.config['SQLALCHEMY_DATABASE_URI'] = DatabaseConfig.get_database_url()
+
+# Apply Flask configuration
+flask_config = FlaskConfig.get_config_dict()
+for key, value in flask_config.items():
+    app.config[key] = value
+
+# Import db from models to avoid circular imports
+from models import db
+
+# Initialize SQLAlchemy
+db.init_app(app)
+migrate = Migrate(app, db)
+
+def initialize_database(app, db):
+    """Initialize database tables and add sample data"""
     with app.app_context():
-        db.create_all()
-        from app.models.crm_db_models import Clients, CRMs
+        # Import models after db is initialized
+        from models import (
+            CRMs, Clients, ClientCRMAuth,
+            BuilderPrimeClientData, ZohoClientData, HubspotClientData,
+            JobberClientData, JobNimbusClientData
+        )
 
-        # Only initialize if there are no clients
-        if Clients.query.first() is None:
+        # Check if tables exist by using SQLAlchemy's inspect
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        existing_tables = inspector.get_table_names()
+
+        # Check if CRMs table exists and has data
+        if 'crms' not in existing_tables:
+            # Create all tables
+            db.create_all()
             print("✅ All tables created successfully!")
 
             # Add required CRM systems
@@ -59,64 +96,52 @@ def initialize_crm_db(app, db):
                 ('HubSpot', 'HubSpot CRM for marketing and sales', 'https://api.hubapi.com'),
                 ('JobNimbus', 'JobNimbus CRM for field service management', 'https://api.jobnimbus.com'),
             ]
-            crm_objs = {}
+
             for name, desc, url in crm_names:
-                crm = CRMs.query.filter_by(name=name).first()
-                if not crm:
-                    crm = CRMs()
-                    crm.name = name
-                    crm.description = desc
-                    crm.base_url = url
-                    db.session.add(crm)
-                    db.session.commit()
-                    print(f"✅ Added CRM system: {name}")
-                crm_objs[name] = crm
-
-            # Add a sample client
-            sample_client = Clients.query.filter_by(email='admin@example.com').first()
-            if not sample_client:
-                sample_client = Clients()
-                sample_client.name = 'Admin User'
-                sample_client.email = 'admin@example.com'
-                sample_client.other_contact_info = 'System Administrator'
-                db.session.add(sample_client)
+                crm = CRMs()
+                crm.name = name
+                crm.description = desc
+                crm.base_url = url
+                db.session.add(crm)
                 db.session.commit()
-                print("✅ Added sample client: Admin User")
+                print(f"✅ Added CRM system: {name}")
 
-            db.session.commit()
-            print("\n🎉 CRM_db database initialized successfully!")
+            print("\n🎉 Database initialized successfully!")
             print("\nTables created:")
-            print("- crm_systems")
+            print("- crms")
             print("- clients")
             print("- client_crm_auth")
-            print("- unified_leads")
+            print("- builder_prime_client_data")
+            print("- zoho_client_data")
+            print("- hubspot_client_data")
+            print("- jobber_client_data")
+            print("- jobnimbus_client_data")
             print("\nSample data added:")
             print("- 5 CRM systems (Zoho, Jobber, BuilderPrime, HubSpot, JobNimbus)")
-            print("- 1 sample client (Admin User)")
         else:
             print("✅ Database already initialized. Skipping table creation and sample data.")
 
-# Load Vault secrets
-VAULT_ADDR = os.getenv("VAULT_ADDR")
-VAULT_TOKEN = os.getenv("VAULT_TOKEN")
-VAULT_SECRET_PATH = os.getenv("VAULT_SECRET_PATH")
-if not all([VAULT_ADDR, VAULT_TOKEN, VAULT_SECRET_PATH]):
-    raise RuntimeError("❌ Missing Vault environment variables")
-secrets = load_secrets(VAULT_ADDR, VAULT_TOKEN, VAULT_SECRET_PATH)
+# Register blueprints
+from routes.client_routes import client_bp
+from routes.builderprime_routes import builderprime_bp
+from config.swagger_config import swagger_bp
 
-app = create_app()
-from app import db
+app.register_blueprint(client_bp)
+app.register_blueprint(builderprime_bp)
+app.register_blueprint(swagger_bp)
 
-# Always initialize the CRM database; let it handle sample data checks
-initialize_crm_db(app, db)
+@app.route('/')
+def home():
+    return "CRM Integration API is running!"
 
-# Only initialize the CRM database in the main process (not the Flask reloader)
-if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
-    initialize_crm_db(app, db)
-
+# Initialize the database only once
 if __name__ == '__main__':
-    app.run(
-        host=Config.HOST,
-        port=int(Config.PORT),
-        debug=False if Config.FLASK_ENV == "production" else True
-    )
+    # Get host and port from configuration
+    FLASK_HOST = FlaskConfig.HOST
+    FLASK_PORT = FlaskConfig.PORT
+
+    # Initialize database only in main process
+    initialize_database(app, db)
+
+    # Run the Flask app
+    app.run(debug=FlaskConfig.DEBUG, host=FLASK_HOST, port=FLASK_PORT)
