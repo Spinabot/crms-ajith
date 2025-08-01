@@ -11,7 +11,7 @@ class FlaskConfig:
     ENV = os.getenv('FLASK_ENV', 'development')
     DEBUG = os.getenv('FLASK_DEBUG', '1') == '1'
     HOST = os.getenv('FLASK_HOST', '0.0.0.0')
-    PORT = int(os.getenv('FLASK_PORT', '5000'))
+    PORT = int(os.getenv('FLASK_PORT', '5001'))  # Changed from 5000 to 5001
 
     # SQLAlchemy configuration
     SQLALCHEMY_TRACK_MODIFICATIONS = False

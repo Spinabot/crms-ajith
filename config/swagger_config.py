@@ -2,6 +2,7 @@ from flask_restx import Api, Resource, fields
 from flask import Blueprint
 from controllers.client_controller import ClientController
 from controllers.builderprime_controller import BuilderPrimeController
+from controllers import jobber_controller
 
 # Create blueprint for Swagger
 swagger_bp = Blueprint('swagger', __name__)
@@ -20,6 +21,7 @@ api = Api(
 # Define namespaces
 client_ns = api.namespace('api/clients', description='Client operations')
 builderprime_ns = api.namespace('api/builderprime', description='BuilderPrime CRM operations')
+jobber_ns = api.namespace('api/jobber', description='Jobber CRM operations')
 
 # Define CRM integration model
 crm_integration_model = api.model('CRMIntegration', {
@@ -188,6 +190,34 @@ builderprime_api_response_model = api.model('BuilderPrimeAPIResponse', {
     'data': fields.Raw(description='BuilderPrime API response data including builderprime_data array')
 })
 
+# Define Jobber models
+jobber_client_model = api.model('JobberClient', {
+    'id': fields.String(description='Jobber client ID'),
+    'first_name': fields.String(description='Client first name'),
+    'last_name': fields.String(description='Client last name'),
+    'email': fields.String(description='Client email address'),
+    'company_name': fields.String(description='Client company name')
+})
+
+jobber_job_model = api.model('JobberJob', {
+    'id': fields.String(description='Jobber job ID'),
+    'title': fields.String(description='Job title'),
+    'status': fields.String(description='Job status')
+})
+
+jobber_client_create_model = api.model('JobberClientCreate', {
+    'first_name': fields.String(required=True, description='Client first name', example='John'),
+    'last_name': fields.String(required=True, description='Client last name', example='Doe'),
+    'email': fields.String(required=True, description='Client email address', example='john.doe@example.com'),
+    'company_name': fields.String(description='Client company name', example='Acme Corp')
+})
+
+jobber_response_model = api.model('JobberResponse', {
+    'success': fields.Boolean(description='Operation success status'),
+    'message': fields.String(description='Response message'),
+    'data': fields.Raw(description='Jobber API response data')
+})
+
 @client_ns.route('/')
 class ClientList(Resource):
     @client_ns.doc('create_client')
@@ -341,3 +371,42 @@ class BuilderPrimeLeadUpdate(Resource):
         Data is also updated in the local database for tracking.
         """
         return BuilderPrimeController.update_lead(client_id, opportunity_id)
+
+@jobber_ns.route('/clients')
+class JobberClients(Resource):
+    @jobber_ns.doc('get_jobber_clients')
+    @jobber_ns.marshal_with(jobber_response_model)
+    @jobber_ns.response(500, 'Internal Server Error', error_model)
+    def get(self):
+        """
+        Get all clients from Jobber
+
+        Retrieve a list of all clients from the Jobber CRM system.
+        """
+        return jobber_controller.get_jobber_clients()
+
+    @jobber_ns.doc('create_jobber_client')
+    @jobber_ns.expect(jobber_client_create_model)
+    @jobber_ns.marshal_with(jobber_response_model, code=201)
+    @jobber_ns.response(400, 'Validation Error', error_model)
+    @jobber_ns.response(500, 'Internal Server Error', error_model)
+    def post(self):
+        """
+        Create a new client in Jobber
+
+        Create a new client in the Jobber CRM system with the provided information.
+        """
+        return jobber_controller.post_jobber_client()
+
+@jobber_ns.route('/jobs')
+class JobberJobs(Resource):
+    @jobber_ns.doc('get_jobber_jobs')
+    @jobber_ns.marshal_with(jobber_response_model)
+    @jobber_ns.response(500, 'Internal Server Error', error_model)
+    def get(self):
+        """
+        Get all jobs from Jobber
+
+        Retrieve a list of all jobs from the Jobber CRM system.
+        """
+        return jobber_controller.get_jobber_jobs()
