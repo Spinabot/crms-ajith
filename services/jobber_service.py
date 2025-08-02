@@ -7,92 +7,46 @@ load_dotenv()
 
 GRAPHQL_URL = "https://api.getjobber.com/api/graphql"
 
+
 def get_access_token():
-    """Get access token and check if it's expired"""
     expires = int(os.getenv("JOBBER_TOKEN_EXPIRES_AT", 0))
     if time.time() > expires:
         raise Exception("Access token expired; refresh required")
     return os.getenv("JOBBER_ACCESS_TOKEN")
 
+
 def get_headers():
-    """Get headers with Bearer token"""
     token = get_access_token()
-    if not token:
-        raise Exception("No access token found. Please authorize with Jobber first.")
-    
     return {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
 
+
 def _execute(query, variables=None, operation_name=None):
-    """Execute GraphQL query/mutation with improved error handling"""
     payload = {"query": query}
     if variables:
         payload["variables"] = variables
     if operation_name:
         payload["operationName"] = operation_name
 
-    try:
-        resp = requests.post(GRAPHQL_URL, json=payload, headers=get_headers())
-        resp.raise_for_status()
-    except requests.HTTPError as e:
-        print("🔧 GraphQL Request Payload:", payload)
-        print("🔧 GraphQL Response:", resp.status_code, resp.text)
-        if resp.status_code == 401:
-            raise Exception("Access token expired or invalid. Please refresh your token.")
-        raise Exception(f"HTTP Error: {resp.status_code} - {resp.text}")
+    response = requests.post(GRAPHQL_URL, json=payload, headers=get_headers())
 
-    data = resp.json()
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as e:
+        print("GraphQL Request Payload:", payload)
+        print("GraphQL Response:", response.status_code, response.text)
+        raise e
+
+    data = response.json()
     if "errors" in data:
-        print("🔧 GraphQL Errors:", data["errors"])
         raise Exception(data["errors"][0].get("message"))
     return data.get("data")
 
-def fetch_clients(first: int = 50, after: str = None):
-    """Fetch clients from Jobber"""
-    query = """
-    query ($first: Int!, $after: String) {
-      clients(first: $first, after: $after) {
-        nodes {
-          id
-          firstName
-          lastName
-          emails {
-            primary
-            address
-          }
-          companyName
-        }
-        pageInfo { 
-          hasNextPage 
-          endCursor 
-        }
-        totalCount
-      }
-    }"""
-    return _execute(query, {"first": first, "after": after})
 
-def fetch_jobs(first: int = 50, after: str = None):
-    """Fetch jobs from Jobber"""
-    query = """
-    query ($first: Int!, $after: String) {
-      jobs(first: $first, after: $after) {
-        nodes {
-          id
-          jobNumber
-          title
-          status
-        }
-        pageInfo { 
-          hasNextPage 
-          endCursor 
-        }
-      }
-    }"""
-    return _execute(query, {"first": first, "after": after})
-
+# CREATE
 def create_client(first_name: str, last_name: str, email: str, company_name: str = None):
     """Create a new client in Jobber with improved mutation"""
     mutation = """
@@ -124,3 +78,94 @@ def create_client(first_name: str, last_name: str, email: str, company_name: str
     if errors:
         raise Exception(errors[0]["message"])
     return result["clientCreate"]["client"]
+
+
+# READ (List)
+def get_clients(first: int = 50, after: str = None):
+    """Get clients from Jobber (alias for fetch_clients)"""
+    return fetch_clients(first, after)
+
+
+# READ (Single)
+def get_client_by_id(client_id: str):
+    """Get a specific client by ID from Jobber"""
+    query = """
+    query ($id: ID!) {
+      client(id: $id) {
+        id
+        firstName
+        lastName
+        emails {
+          primary
+          address
+        }
+        companyName
+      }
+    }"""
+    result = _execute(query, {"id": client_id})
+    if not result or not result.get("client"):
+        raise Exception("Client not found")
+    return result["client"]
+
+
+# UPDATE
+def update_client(client_id: str, first_name: str = None, last_name: str = None, email: str = None, company_name: str = None):
+    """Update a client in Jobber"""
+    mutation = """
+    mutation UpdateClient($input: ClientUpdateInput!) {
+      clientUpdate(input: $input) {
+        client {
+          id
+          firstName
+          lastName
+          emails {
+            primary
+            address
+          }
+          companyName
+        }
+        userErrors {
+          message
+          path
+        }
+      }
+    }
+    """
+    
+    input_obj = {"id": client_id}
+    if first_name:
+        input_obj["firstName"] = first_name
+    if last_name:
+        input_obj["lastName"] = last_name
+    if email:
+        input_obj["emails"] = [{"primary": True, "address": email}]
+    if company_name:
+        input_obj["companyName"] = company_name
+
+    result = _execute(mutation, variables={"input": input_obj}, operation_name="UpdateClient")
+    errors = result["clientUpdate"].get("userErrors")
+    if errors:
+        raise Exception(errors[0]["message"])
+    return result["clientUpdate"]["client"]
+
+
+# DELETE
+def delete_client(client_id: str):
+    """Delete a client from Jobber"""
+    mutation = """
+    mutation DeleteClient($input: ClientDeleteInput!) {
+      clientDelete(input: $input) {
+        deletedClientId
+        userErrors {
+          message
+          path
+        }
+      }
+    }
+    """
+    
+    result = _execute(mutation, variables={"input": {"id": client_id}}, operation_name="DeleteClient")
+    errors = result["clientDelete"].get("userErrors")
+    if errors:
+        raise Exception(errors[0]["message"])
+    return {"id": result["clientDelete"]["deletedClientId"]}

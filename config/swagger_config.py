@@ -383,7 +383,8 @@ class JobberClients(Resource):
 
         Retrieve a list of all clients from the Jobber CRM system.
         """
-        return jobber_controller.get_jobber_clients()
+        from controllers.jobber_controller import list_clients_route
+        return list_clients_route()
 
     @jobber_ns.doc('create_jobber_client')
     @jobber_ns.expect(jobber_client_create_model)
@@ -396,7 +397,8 @@ class JobberClients(Resource):
 
         Create a new client in the Jobber CRM system with the provided information.
         """
-        return jobber_controller.post_jobber_client()
+        from controllers.jobber_controller import create_client_route
+        return create_client_route()
 
 @jobber_ns.route('/jobs')
 class JobberJobs(Resource):
@@ -409,4 +411,66 @@ class JobberJobs(Resource):
 
         Retrieve a list of all jobs from the Jobber CRM system.
         """
-        return jobber_controller.get_jobber_jobs()
+        from services.jobber_service import fetch_jobs
+        try:
+            data = fetch_jobs()
+            if data and "jobs" in data and "nodes" in data["jobs"]:
+                jobs = []
+                for job in data["jobs"]["nodes"]:
+                    job_data = {
+                        "id": str(job.get("id", "")),
+                        "job_number": job.get("jobNumber", ""),
+                        "title": job.get("title", ""),
+                        "status": job.get("status", "")
+                    }
+                    jobs.append(job_data)
+                
+                return {"success": True, "message": "Jobs retrieved successfully", "data": jobs}, 200
+            else:
+                return {"success": False, "message": "No job data found", "data": []}, 200
+        except Exception as e:
+            return {"success": False, "message": f"Error fetching jobs: {str(e)}", "data": None}, 500
+
+@jobber_ns.route('/clients/<string:client_id>')
+@jobber_ns.param('client_id', 'The Jobber client identifier')
+class JobberClientDetail(Resource):
+    @jobber_ns.doc('get_jobber_client_by_id')
+    @jobber_ns.marshal_with(jobber_response_model)
+    @jobber_ns.response(404, 'Client not found', error_model)
+    @jobber_ns.response(500, 'Internal Server Error', error_model)
+    def get(self, client_id):
+        """
+        Get a specific Jobber client by ID
+
+        Retrieve a single client from the Jobber CRM system by their unique identifier.
+        """
+        from controllers.jobber_controller import get_client_route
+        return get_client_route(client_id)
+
+    @jobber_ns.doc('update_jobber_client')
+    @jobber_ns.expect(jobber_client_create_model)
+    @jobber_ns.marshal_with(jobber_response_model)
+    @jobber_ns.response(400, 'Validation Error', error_model)
+    @jobber_ns.response(404, 'Client not found', error_model)
+    @jobber_ns.response(500, 'Internal Server Error', error_model)
+    def put(self, client_id):
+        """
+        Update a Jobber client by ID
+
+        Update an existing client in the Jobber CRM system with the provided information.
+        """
+        from controllers.jobber_controller import update_client_route
+        return update_client_route(client_id)
+
+    @jobber_ns.doc('delete_jobber_client')
+    @jobber_ns.marshal_with(jobber_response_model)
+    @jobber_ns.response(404, 'Client not found', error_model)
+    @jobber_ns.response(500, 'Internal Server Error', error_model)
+    def delete(self, client_id):
+        """
+        Delete a Jobber client by ID
+
+        Remove a client from the Jobber CRM system by their unique identifier.
+        """
+        from controllers.jobber_controller import delete_client_route
+        return delete_client_route(client_id)

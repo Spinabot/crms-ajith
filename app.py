@@ -145,7 +145,9 @@ def initialize_database(app, db):
 from routes.client_routes import client_bp
 from routes.builderprime_routes import builderprime_bp
 from config.swagger_config import swagger_bp
+from controllers.jobber_controller import jobber_bp
 
+app.register_blueprint(jobber_bp)
 app.register_blueprint(client_bp)
 app.register_blueprint(builderprime_bp)
 app.register_blueprint(swagger_bp)
