@@ -125,7 +125,35 @@ def create_person():
         description: Created person
     """
     data = request.get_json()
-    result = capsule_service.make_capsule_request("POST", "parties", data=data)
+    
+    # Format the payload according to Capsule CRM API requirements
+    payload = {
+        "party": {
+            "type": "person",
+            "firstName": data.get("first_name", ""),
+            "lastName": data.get("last_name", "")
+        }
+    }
+    
+    # Add email addresses if provided
+    if data.get("email"):
+        payload["party"]["emailAddresses"] = [
+            {
+                "address": data["email"],
+                "type": "Home"
+            }
+        ]
+    
+    # Add phone numbers if provided
+    if data.get("phone"):
+        payload["party"]["phoneNumbers"] = [
+            {
+                "number": data["phone"],
+                "type": "Home"
+            }
+        ]
+    
+    result = capsule_service.make_capsule_request("POST", "parties", data=payload)
     return jsonify(result), 201
 
 
@@ -180,7 +208,37 @@ def update_person(person_id):
         description: Updated contact
     """
     data = request.get_json()
-    updated = capsule_service.make_capsule_request("PUT", f"parties/{person_id}", data=data)
+    
+    # Format the payload according to Capsule CRM API requirements
+    payload = {
+        "party": {}
+    }
+    
+    # Add fields if provided
+    if data.get("first_name"):
+        payload["party"]["firstName"] = data["first_name"]
+    if data.get("last_name"):
+        payload["party"]["lastName"] = data["last_name"]
+    
+    # Add email addresses if provided
+    if data.get("email"):
+        payload["party"]["emailAddresses"] = [
+            {
+                "address": data["email"],
+                "type": "Home"
+            }
+        ]
+    
+    # Add phone numbers if provided
+    if data.get("phone"):
+        payload["party"]["phoneNumbers"] = [
+            {
+                "number": data["phone"],
+                "type": "Home"
+            }
+        ]
+    
+    updated = capsule_service.make_capsule_request("PUT", f"parties/{person_id}", data=payload)
     return jsonify(updated)
 
 

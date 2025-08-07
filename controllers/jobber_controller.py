@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, redirect
+import logging
 from services.jobber_service import (
     create_client,
     get_clients,
@@ -9,6 +10,9 @@ from services.jobber_service import (
     exchange_code_for_token,
     get_jobber_token
 )
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 jobber_bp = Blueprint("jobber", __name__, url_prefix="/api/jobber")
 
@@ -25,6 +29,7 @@ def authorize_jobber():
       302:
         description: Redirect to Jobber authorization page
     """
+    logger.info("Starting Jobber OAuth authorization")
     auth_url = get_authorization_url()
     return redirect(auth_url)
 
@@ -53,12 +58,16 @@ def jobber_callback():
     """
     code = request.args.get("code")
     if not code:
+        logger.error("Missing authorization code in callback")
         return jsonify({"error": "Missing code"}), 400
 
     try:
+        logger.info("Processing OAuth callback with authorization code")
         exchange_code_for_token(code)
+        logger.info("OAuth callback completed successfully")
         return jsonify({"success": True, "message": "Token stored successfully"})
     except Exception as e:
+        logger.error(f"OAuth callback failed: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -95,14 +104,17 @@ def debug_token():
 def create_client_route():
     try:
         data = request.json
+        logger.info(f"Creating new Jobber client: {data.get('first_name')} {data.get('last_name')}")
         client = create_client(
             first_name=data.get("first_name"),
             last_name=data.get("last_name"),
             email=data.get("email"),
             company_name=data.get("company_name")
         )
+        logger.info(f"Successfully created Jobber client: {client.get('id')}")
         return jsonify({"success": True, "client": client}), 201
     except Exception as e:
+        logger.error(f"Failed to create Jobber client: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 400
 
 

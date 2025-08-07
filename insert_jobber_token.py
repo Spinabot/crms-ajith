@@ -29,11 +29,21 @@ def insert_jobber_token():
             print(f"Access token: {existing_token.access_token[:20]}...")
             return
         
-        # Insert the new token (you'll need to replace this with a real token)
+        # Get token from user input
+        print("🔑 Please provide your Jobber access token:")
+        access_token = input("Access Token: ").strip()
+        
+        if not access_token:
+            print("❌ No access token provided. Exiting.")
+            return
+        
+        refresh_token = input("Refresh Token (optional, press Enter to skip): ").strip()
+        
+        # Insert the token
         print("Inserting Jobber access token...")
         token = JobberToken()
-        token.access_token = "YOUR_JOBBER_ACCESS_TOKEN_HERE"  # Replace with actual token
-        token.refresh_token = "YOUR_JOBBER_REFRESH_TOKEN_HERE"  # Replace with actual refresh token
+        token.access_token = access_token
+        token.refresh_token = refresh_token or ""
         token.expires_at = int(time.time()) + (365 * 24 * 60 * 60)  # 1 year from now
         
         db.session.add(token)
