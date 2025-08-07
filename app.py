@@ -89,7 +89,7 @@ def initialize_database(app, db):
         with app.app_context():
             # Import models after db is initialized
             from models import (
-                CRMs, Clients, ClientCRMAuth,
+                CRMs, Clients, ClientCRMAuth, CapsuleToken, JobberToken,
                 BuilderPrimeClientData, ZohoClientData, HubspotClientData,
                 JobberClientData, JobNimbusClientData
             )
@@ -112,6 +112,7 @@ def initialize_database(app, db):
                     ('BuilderPrime', 'BuilderPrime CRM system for construction management', 'https://api.builderprime.com'),
                     ('HubSpot', 'HubSpot CRM for marketing and sales', 'https://api.hubapi.com'),
                     ('JobNimbus', 'JobNimbus CRM for field service management', 'https://api.jobnimbus.com'),
+                    ('Capsule', 'Capsule CRM for business management', 'https://api.capsulecrm.com'),
                 ]
 
                 for name, desc, url in crm_names:
@@ -128,13 +129,14 @@ def initialize_database(app, db):
                 print("- crms")
                 print("- clients")
                 print("- client_crm_auth")
+                print("- capsule_tokens")
                 print("- builder_prime_client_data")
                 print("- zoho_client_data")
                 print("- hubspot_client_data")
                 print("- jobber_client_data")
                 print("- jobnimbus_client_data")
                 print("\nSample data added:")
-                print("- 5 CRM systems (Zoho, Jobber, BuilderPrime, HubSpot, JobNimbus)")
+                print("- 6 CRM systems (Zoho, Jobber, BuilderPrime, HubSpot, JobNimbus, Capsule)")
             else:
                 print("✅ Database already initialized. Skipping table creation and sample data.")
     except Exception as e:
@@ -146,7 +148,9 @@ from routes.client_routes import client_bp
 from routes.builderprime_routes import builderprime_bp
 from config.swagger_config import swagger_bp
 from controllers.jobber_controller import jobber_bp
+from controllers.capsule_controller import capsule_bp
 
+app.register_blueprint(capsule_bp)
 app.register_blueprint(jobber_bp)
 app.register_blueprint(client_bp)
 app.register_blueprint(builderprime_bp)
@@ -158,6 +162,16 @@ def home():
     <h1>🚀 CRM Integration API is Running!</h1>
     
     <h2>Available Endpoints:</h2>
+    
+    <h3>Capsule CRM Integration (People/Contacts):</h3>
+    <ul>
+        <li><a href="/api/capsule/auth">GET /api/capsule/auth</a> - Start OAuth authorization</li>
+        <li><a href="/api/capsule/people">GET /api/capsule/people</a> - Get all people/contacts</li>
+        <li>POST /api/capsule/people - Create new person/contact</li>
+        <li>GET /api/capsule/people/{id} - Get person by ID</li>
+        <li>PUT /api/capsule/people/{id} - Update person</li>
+        <li>DELETE /api/capsule/people/{id} - Delete person</li>
+    </ul>
     
     <h3>Jobber Integration:</h3>
     <ul>

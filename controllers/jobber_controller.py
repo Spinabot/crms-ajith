@@ -1,13 +1,93 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, redirect
 from services.jobber_service import (
     create_client,
     get_clients,
     get_client_by_id,
     update_client,
-    delete_client
+    delete_client,
+    get_authorization_url,
+    exchange_code_for_token,
+    get_jobber_token
 )
 
 jobber_bp = Blueprint("jobber", __name__, url_prefix="/api/jobber")
+
+
+# OAuth Step 1: Redirect to authorization
+@jobber_bp.route("/auth")
+def authorize_jobber():
+    """
+    Start OAuth authorization for Jobber CRM
+    ---
+    tags:
+      - Jobber CRM
+    responses:
+      302:
+        description: Redirect to Jobber authorization page
+    """
+    auth_url = get_authorization_url()
+    return redirect(auth_url)
+
+
+# OAuth Step 2: Handle callback and exchange code
+@jobber_bp.route("/callback")
+def jobber_callback():
+    """
+    Handle OAuth callback from Jobber CRM
+    ---
+    tags:
+      - Jobber CRM
+    parameters:
+      - name: code
+        in: query
+        type: string
+        required: true
+        description: Authorization code from Jobber
+    responses:
+      200:
+        description: Token stored successfully
+      400:
+        description: Missing authorization code
+      500:
+        description: Error exchanging code for token
+    """
+    code = request.args.get("code")
+    if not code:
+        return jsonify({"error": "Missing code"}), 400
+
+    try:
+        exchange_code_for_token(code)
+        return jsonify({"success": True, "message": "Token stored successfully"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# Debug endpoint to check token status
+@jobber_bp.route("/token/debug", methods=["GET"])
+def debug_token():
+    """
+    Debug endpoint to check token status
+    ---
+    tags:
+      - Jobber CRM
+    responses:
+      200:
+        description: Token information
+      404:
+        description: No token found
+    """
+    try:
+        token = get_jobber_token()
+        if not token:
+            return jsonify({"error": "No token found"}), 404
+        return jsonify({
+            "success": True,
+            "token_exists": True,
+            "expires_at": token["expires_at"],
+            "has_refresh_token": bool(token.get("refresh_token"))
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # CREATE - Create a new client

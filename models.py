@@ -44,6 +44,28 @@ class ClientCRMAuth(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class CapsuleToken(db.Model):
+    """Capsule CRM OAuth tokens table"""
+    __tablename__ = 'capsule_tokens'
+
+    id = db.Column(db.Integer, primary_key=True)
+    access_token = db.Column(db.String(500), nullable=False)
+    refresh_token = db.Column(db.String(500), nullable=True)
+    expires_at = db.Column(db.Integer, nullable=False)  # Unix timestamp
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class JobberToken(db.Model):
+    """Jobber CRM OAuth tokens table"""
+    __tablename__ = 'jobber_tokens'
+
+    id = db.Column(db.Integer, primary_key=True)
+    access_token = db.Column(db.String(500), nullable=False)
+    refresh_token = db.Column(db.String(500), nullable=True)
+    expires_at = db.Column(db.Integer, nullable=False)  # Unix timestamp
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class BuilderPrimeClientData(db.Model):

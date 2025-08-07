@@ -22,6 +22,7 @@ api = Api(
 client_ns = api.namespace('api/clients', description='Client operations')
 builderprime_ns = api.namespace('api/builderprime', description='BuilderPrime CRM operations')
 jobber_ns = api.namespace('api/jobber', description='Jobber CRM operations')
+capsule_ns = api.namespace('api/capsule', description='Capsule CRM operations')
 
 # Define CRM integration model
 crm_integration_model = api.model('CRMIntegration', {
@@ -191,31 +192,43 @@ builderprime_api_response_model = api.model('BuilderPrimeAPIResponse', {
 })
 
 # Define Jobber models
-jobber_client_model = api.model('JobberClient', {
-    'id': fields.String(description='Jobber client ID'),
-    'first_name': fields.String(description='Client first name'),
-    'last_name': fields.String(description='Client last name'),
-    'email': fields.String(description='Client email address'),
-    'company_name': fields.String(description='Client company name')
-})
-
-jobber_job_model = api.model('JobberJob', {
-    'id': fields.String(description='Jobber job ID'),
-    'title': fields.String(description='Job title'),
-    'status': fields.String(description='Job status')
-})
-
 jobber_client_create_model = api.model('JobberClientCreate', {
-    'first_name': fields.String(required=True, description='Client first name', example='John'),
-    'last_name': fields.String(required=True, description='Client last name', example='Doe'),
-    'email': fields.String(required=True, description='Client email address', example='john.doe@example.com'),
-    'company_name': fields.String(description='Client company name', example='Acme Corp')
+    'first_name': fields.String(required=True, description='First name', example='John'),
+    'last_name': fields.String(required=True, description='Last name', example='Doe'),
+    'email': fields.String(required=True, description='Email address', example='john.doe@example.com'),
+    'company_name': fields.String(description='Company name', example='Acme Corp')
 })
 
 jobber_response_model = api.model('JobberResponse', {
     'success': fields.Boolean(description='Operation success status'),
     'message': fields.String(description='Response message'),
     'data': fields.Raw(description='Jobber API response data')
+})
+
+# Define Capsule CRM models
+capsule_person_model = api.model('CapsulePerson', {
+    'id': fields.String(description='Person ID'),
+    'firstName': fields.String(description='First name'),
+    'lastName': fields.String(description='Last name'),
+    'emailAddresses': fields.List(fields.Raw, description='Email addresses'),
+    'type': fields.String(description='Person type', example='person')
+})
+
+capsule_person_create_model = api.model('CapsulePersonCreate', {
+    'party': fields.Nested(api.model('CapsuleParty', {
+        'type': fields.String(required=True, description='Party type', example='person'),
+        'firstName': fields.String(description='First name'),
+        'lastName': fields.String(description='Last name'),
+        'emailAddresses': fields.List(fields.Nested(api.model('CapsuleEmail', {
+            'address': fields.String(description='Email address')
+        })), description='Email addresses')
+    }), description='Party information')
+})
+
+capsule_response_model = api.model('CapsuleResponse', {
+    'success': fields.Boolean(description='Operation success status'),
+    'message': fields.String(description='Response message'),
+    'data': fields.Raw(description='Capsule API response data')
 })
 
 @client_ns.route('/')
@@ -474,3 +487,114 @@ class JobberClientDetail(Resource):
         """
         from controllers.jobber_controller import delete_client_route
         return delete_client_route(client_id)
+
+
+# ---------- Capsule CRM Routes ----------
+
+@capsule_ns.route('/auth')
+class CapsuleAuth(Resource):
+    @capsule_ns.doc('start_capsule_auth')
+    @capsule_ns.response(302, 'Redirect to Capsule authorization page')
+    def get(self):
+        """
+        Start OAuth authorization for Capsule CRM
+
+        Redirects to Capsule's OAuth authorization page to begin the authentication process.
+        """
+        from controllers.capsule_controller import start_auth
+        return start_auth()
+
+
+@capsule_ns.route('/callback')
+class CapsuleCallback(Resource):
+    @capsule_ns.doc('handle_capsule_callback')
+    @capsule_ns.param('code', 'Authorization code from Capsule', required=True)
+    @capsule_ns.response(200, 'Token stored successfully')
+    @capsule_ns.response(400, 'Missing authorization code')
+    @capsule_ns.response(500, 'Error exchanging code for token')
+    def get(self):
+        """
+        Handle OAuth callback from Capsule CRM
+
+        Processes the authorization code returned by Capsule and exchanges it for access tokens.
+        """
+        from controllers.capsule_controller import auth_callback
+        return auth_callback()
+
+
+@capsule_ns.route('/people')
+class CapsulePeople(Resource):
+    @capsule_ns.doc('get_capsule_people')
+    @capsule_ns.marshal_with(capsule_response_model)
+    @capsule_ns.response(200, 'A list of contacts')
+    @capsule_ns.response(500, 'Internal Server Error', error_model)
+    def get(self):
+        """
+        Get all Capsule People (Contacts)
+
+        Retrieve a list of all people/contacts from the Capsule CRM system.
+        """
+        from controllers.capsule_controller import get_people
+        return get_people()
+
+    @capsule_ns.doc('create_capsule_person')
+    @capsule_ns.expect(capsule_person_create_model)
+    @capsule_ns.marshal_with(capsule_response_model, code=201)
+    @capsule_ns.response(201, 'Person created')
+    @capsule_ns.response(400, 'Validation Error', error_model)
+    @capsule_ns.response(500, 'Internal Server Error', error_model)
+    def post(self):
+        """
+        Create a Capsule Person
+
+        Create a new person/contact in the Capsule CRM system.
+        """
+        from controllers.capsule_controller import create_person
+        return create_person()
+
+
+@capsule_ns.route('/people/<string:person_id>')
+@capsule_ns.param('person_id', 'The Capsule person identifier')
+class CapsulePersonDetail(Resource):
+    @capsule_ns.doc('get_capsule_person')
+    @capsule_ns.marshal_with(capsule_response_model)
+    @capsule_ns.response(200, 'Person details')
+    @capsule_ns.response(404, 'Person not found', error_model)
+    @capsule_ns.response(500, 'Internal Server Error', error_model)
+    def get(self, person_id):
+        """
+        Get a Capsule Person by ID
+
+        Retrieve a single person/contact from the Capsule CRM system by their unique identifier.
+        """
+        from controllers.capsule_controller import get_person
+        return get_person(person_id)
+
+    @capsule_ns.doc('update_capsule_person')
+    @capsule_ns.expect(capsule_person_create_model)
+    @capsule_ns.marshal_with(capsule_response_model)
+    @capsule_ns.response(200, 'Person updated')
+    @capsule_ns.response(400, 'Validation Error', error_model)
+    @capsule_ns.response(404, 'Person not found', error_model)
+    @capsule_ns.response(500, 'Internal Server Error', error_model)
+    def put(self, person_id):
+        """
+        Update a Capsule Person
+
+        Update an existing person/contact in the Capsule CRM system.
+        """
+        from controllers.capsule_controller import update_person
+        return update_person(person_id)
+
+    @capsule_ns.doc('delete_capsule_person')
+    @capsule_ns.response(204, 'Person deleted')
+    @capsule_ns.response(404, 'Person not found', error_model)
+    @capsule_ns.response(500, 'Internal Server Error', error_model)
+    def delete(self, person_id):
+        """
+        Delete a Capsule Person
+
+        Remove a person/contact from the Capsule CRM system by their unique identifier.
+        """
+        from controllers.capsule_controller import delete_person
+        return delete_person(person_id)
