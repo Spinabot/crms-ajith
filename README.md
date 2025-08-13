@@ -498,3 +498,25 @@ If you encounter validation errors when updating leads, the API will provide hel
 - **CRMs** ↔ **CRM Client Data Tables** (One-to-Many)
 
 Each CRM client data table stores client information specific to that CRM system while maintaining relationships with the core CRM and client tables.
+
+## OAuth Fix (Jobber)
+
+Update `services/jobber_service.py` constants:
+
+```python
+# === Jobber OAuth configuration ===
+CLIENT_ID     = os.getenv("JOBBER_CLIENT_ID", "6c6a5fb3-9c6b-4887-80cb-c65f1cc2825a")
+CLIENT_SECRET = os.getenv("JOBBER_CLIENT_SECRET", "dddff56b393da10a8519f36e4d7b13e273c83a80c1044f6d41e4d16aa92645b4")
+REDIRECT_URI  = os.getenv("JOBBER_REDIRECT_URI", "http://localhost:5001/api/jobber/callback")
+AUTH_URL      = "https://api.getjobber.com/api/oauth/authorize"
+TOKEN_URL     = "https://api.getjobber.com/api/oauth/token"
+GRAPHQL_URL   = "https://api.getjobber.com/api/graphql"
+```
+
+Ensure `.env` contains:
+
+```
+JOBBER_CLIENT_ID=6c6a5fb3-9c6b-4887-80cb-c65f1cc2825a
+JOBBER_CLIENT_SECRET=dddff56b393da10a8519f36e4d7b13e273c83a80c1044f6d41e4d16aa92645b4
+JOBBER_REDIRECT_URI=http://localhost:5001/api/jobber/callback
+```

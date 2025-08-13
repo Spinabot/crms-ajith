@@ -90,7 +90,7 @@ def initialize_database(app, db):
             # Import models after db is initialized
             from models import (
                 CRMs, Clients, ClientCRMAuth, CapsuleToken, JobberToken,
-                BuilderPrimeClientData, ZohoClientData, HubspotClientData,
+                JobNimbusCredentials, BuilderPrimeClientData, ZohoClientData, HubspotClientData,
                 JobberClientData, JobNimbusClientData
             )
 
@@ -149,8 +149,10 @@ from routes.builderprime_routes import builderprime_bp
 from config.swagger_config import swagger_bp
 from controllers.jobber_controller import jobber_bp
 from controllers.capsule_controller import capsule_bp
+from controllers.jobnimbus_controller import jobnimbus_bp
 
 app.register_blueprint(capsule_bp)
+app.register_blueprint(jobnimbus_bp)
 app.register_blueprint(jobber_bp)
 app.register_blueprint(client_bp)
 app.register_blueprint(builderprime_bp)

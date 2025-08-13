@@ -23,6 +23,7 @@ client_ns = api.namespace('api/clients', description='Client operations')
 builderprime_ns = api.namespace('api/builderprime', description='BuilderPrime CRM operations')
 jobber_ns = api.namespace('api/jobber', description='Jobber CRM operations')
 capsule_ns = api.namespace('api/capsule', description='Capsule CRM operations')
+jobnimbus_ns = api.namespace('api/jobnimbus', description='JobNimbus CRM operations')
 
 # Define CRM integration model
 crm_integration_model = api.model('CRMIntegration', {
@@ -229,6 +230,20 @@ capsule_response_model = api.model('CapsuleResponse', {
     'success': fields.Boolean(description='Operation success status'),
     'message': fields.String(description='Response message'),
     'data': fields.Raw(description='Capsule API response data')
+})
+
+# Define JobNimbus models
+jobnimbus_contact_model = api.model('JobNimbusContact', {
+    'firstName': fields.String(required=True, description='First name', example='Jane'),
+    'lastName': fields.String(required=True, description='Last name', example='Roofer'),
+    'email': fields.String(description='Email', example='jane@example.com'),
+    'phone': fields.String(description='Phone', example='555-1212'),
+    'type': fields.String(description='Contact type', example='lead')
+})
+
+jobnimbus_response_model = api.model('JobNimbusResponse', {
+    'success': fields.Boolean(description='Operation success status'),
+    'data': fields.Raw(description='JobNimbus API response data')
 })
 
 @client_ns.route('/')
@@ -598,3 +613,88 @@ class CapsulePersonDetail(Resource):
         """
         from controllers.capsule_controller import delete_person
         return delete_person(person_id)
+
+# ---------- JobNimbus Routes ----------
+
+@jobnimbus_ns.route('/health')
+class JobNimbusHealth(Resource):
+    @jobnimbus_ns.doc('jobnimbus_health')
+    @jobnimbus_ns.marshal_with(jobnimbus_response_model)
+    def get(self):
+        """
+        Health check for JobNimbus integration
+        """
+        from controllers.jobnimbus_controller import health
+        return health()
+
+@jobnimbus_ns.route('/contacts')
+class JobNimbusContacts(Resource):
+    @jobnimbus_ns.doc('list_jobnimbus_contacts')
+    @jobnimbus_ns.marshal_with(jobnimbus_response_model)
+    def get(self):
+        """
+        List JobNimbus contacts
+        """
+        from controllers.jobnimbus_controller import contacts_list
+        return contacts_list()
+
+    @jobnimbus_ns.doc('create_jobnimbus_contact')
+    @jobnimbus_ns.expect(jobnimbus_contact_model)
+    @jobnimbus_ns.marshal_with(jobnimbus_response_model, code=201)
+    def post(self):
+        """
+        Create a JobNimbus contact
+        """
+        from controllers.jobnimbus_controller import contacts_create
+        return contacts_create()
+
+@jobnimbus_ns.route('/contacts/<string:contact_id>')
+@jobnimbus_ns.param('contact_id', 'The JobNimbus contact identifier')
+class JobNimbusContactDetail(Resource):
+    @jobnimbus_ns.doc('get_jobnimbus_contact')
+    @jobnimbus_ns.marshal_with(jobnimbus_response_model)
+    def get(self, contact_id):
+        """
+        Get a JobNimbus contact by ID
+        """
+        from controllers.jobnimbus_controller import contacts_get
+        return contacts_get(contact_id)
+
+    @jobnimbus_ns.doc('update_jobnimbus_contact')
+    @jobnimbus_ns.expect(jobnimbus_contact_model)
+    @jobnimbus_ns.marshal_with(jobnimbus_response_model)
+    def put(self, contact_id):
+        """
+        Update a JobNimbus contact
+        """
+        from controllers.jobnimbus_controller import contacts_update
+        return contacts_update(contact_id)
+
+    @jobnimbus_ns.doc('delete_jobnimbus_contact')
+    @jobnimbus_ns.marshal_with(jobnimbus_response_model)
+    def delete(self, contact_id):
+        """
+        Delete a JobNimbus contact
+        """
+        from controllers.jobnimbus_controller import contacts_delete
+        return contacts_delete(contact_id)
+
+@jobnimbus_ns.route('/jobs')
+class JobNimbusJobs(Resource):
+    @jobnimbus_ns.doc('list_jobnimbus_jobs')
+    @jobnimbus_ns.marshal_with(jobnimbus_response_model)
+    def get(self):
+        """
+        List JobNimbus jobs
+        """
+        from controllers.jobnimbus_controller import jobs_list
+        return jobs_list()
+
+    @jobnimbus_ns.doc('create_jobnimbus_job')
+    @jobnimbus_ns.marshal_with(jobnimbus_response_model, code=201)
+    def post(self):
+        """
+        Create a JobNimbus job
+        """
+        from controllers.jobnimbus_controller import jobs_create
+        return jobs_create()

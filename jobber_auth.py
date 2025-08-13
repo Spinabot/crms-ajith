@@ -10,7 +10,7 @@ load_dotenv()
 # Your credentials
 CLIENT_ID = os.getenv("JOBBER_CLIENT_ID", "6c6a5fb3-9c6b-4887-80cb-c65f1cc2825a")
 CLIENT_SECRET = os.getenv("JOBBER_CLIENT_SECRET", "dddff56b393da10a8519f36e4d7b13e273c83a80c1044f6d41e4d16aa92645b4")
-REDIRECT_URI = os.getenv("JOBBER_REDIRECT_URI", "http://localhost:5002/jobber/callback")
+REDIRECT_URI = os.getenv("JOBBER_REDIRECT_URI", "http://localhost:5001/api/jobber/callback")
 
 TOKEN_URL = "https://api.getjobber.com/api/oauth/token"
 

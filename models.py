@@ -68,6 +68,19 @@ class JobberToken(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class JobNimbusCredentials(db.Model):
+    """JobNimbus CRM API credentials table"""
+    __tablename__ = 'jobnimbus_credentials'
+
+    id = db.Column(db.Integer, primary_key=True)
+    api_key = db.Column(db.String(500), nullable=False)
+    base_url = db.Column(db.String(255), default='https://api.jobnimbus.com')
+    api_prefix = db.Column(db.String(10), default='v1')
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class BuilderPrimeClientData(db.Model):
     """BuilderPrime CRM client data table"""
     __tablename__ = 'builder_prime_client_data'
