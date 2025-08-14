@@ -14,6 +14,7 @@ FLASK_PORT=5001
 # Merge CRM Integration
 MERGE_API_KEY=your_production_access_key_here
 MERGE_BASE_URL=https://api.merge.dev
+MERGE_WEBHOOK_SECRET=your_webhook_secret_here
 
 # Example Merge API Key format: cjtuJl3...
 # Get your Production Access Key from: https://app.merge.dev/settings/api-keys 

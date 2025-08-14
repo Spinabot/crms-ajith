@@ -118,4 +118,77 @@ def merge_linked_accounts_admin():
         data = list_linked_accounts(category="crm")
         return jsonify(data), 200
     except MergeServiceError as e:
-        return jsonify({"error": str(e)}), 502 
+        return jsonify({"error": str(e)}), 502
+
+@merge_bp.route("/webhook", methods=["POST"])
+def merge_webhook():
+    """
+    Merge -> Your API
+    Verifies X-Merge-Webhook-Signature, then (best-effort) updates MergeLinkedAccount.
+    """
+    from services.merge_service import verify_webhook_signature
+    sig = request.headers.get("X-Merge-Webhook-Signature")
+    raw = request.get_data(cache=False, as_text=False)
+
+    if not verify_webhook_signature(raw, sig):
+        return jsonify({"error": "invalid signature"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    hook = (payload.get("hook") or {})
+    event_type = (hook.get("event_type") or "").lower()
+    la = (payload.get("linked_account") or {})
+
+    # Try to upsert MergeLinkedAccount using account_token or end_user_origin_id
+    account_token = la.get("account_token") or payload.get("account_token")
+    end_user_origin_id = la.get("end_user_origin_id") or la.get("end_user_id")
+    integration_slug = la.get("integration_slug") or la.get("integration") or None
+
+    # Update existing records if we can find them
+    updated = False
+    if account_token:
+        rec = MergeLinkedAccount.query.filter_by(account_token=account_token).first()
+        if rec:
+            # Reflect lifecycle events
+            if "deleted" in event_type:
+                rec.status = "disabled"
+            elif "linked" in event_type or "synced" in event_type or "changed" in event_type:
+                rec.status = "active"
+            if integration_slug and not rec.integration_slug:
+                rec.integration_slug = integration_slug
+            rec.raw = payload
+            db.session.commit()
+            updated = True
+
+    if not updated and end_user_origin_id:
+        rec = MergeLinkedAccount.query.filter_by(end_user_origin_id=end_user_origin_id).first()
+        if rec:
+            if account_token and rec.account_token != account_token:
+                rec.account_token = account_token
+            if "deleted" in event_type:
+                rec.status = "disabled"
+            else:
+                rec.status = "active"
+            rec.raw = payload
+            db.session.commit()
+            updated = True
+
+    # If we can't match anything, just accept and return 204 so Merge doesn't retry.
+    return ("", 204)
+
+@merge_bp.route("/webhook/debug", methods=["GET"])
+def merge_webhook_debug():
+    """Debug endpoint to check webhook configuration and latest webhook data"""
+    from services.merge_service import MERGE_WEBHOOK_SECRET
+    
+    debug_info = {
+        "webhook_secret_configured": bool(MERGE_WEBHOOK_SECRET),
+        "webhook_secret_length": len(MERGE_WEBHOOK_SECRET) if MERGE_WEBHOOK_SECRET else 0,
+        "latest_webhook_data": None
+    }
+    
+    # Try to get the most recent webhook data from any linked account
+    latest_account = MergeLinkedAccount.query.order_by(MergeLinkedAccount.updated_at.desc()).first()
+    if latest_account and latest_account.raw:
+        debug_info["latest_webhook_data"] = latest_account.raw
+    
+    return jsonify(debug_info), 200 

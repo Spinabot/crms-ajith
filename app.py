@@ -152,6 +152,7 @@ from controllers.jobber_controller import jobber_bp
 from controllers.capsule_controller import capsule_bp
 from controllers.jobnimbus_controller import jobnimbus_bp
 from routes.merge_routes import register_merge_routes
+from routes.merge_hris_routes import register_merge_hris_routes
 
 app.register_blueprint(capsule_bp)
 app.register_blueprint(jobnimbus_bp)
@@ -162,6 +163,7 @@ app.register_blueprint(swagger_bp)
 
 # Register Merge routes
 register_merge_routes(app)
+register_merge_hris_routes(app)
 
 @app.route('/')
 def home():
@@ -210,6 +212,20 @@ def home():
         <li>GET /api/merge/clients/{id}/crm/contacts - List contacts</li>
         <li>POST /api/merge/clients/{id}/crm/contacts - Create contact</li>
         <li>GET /api/merge/linked-accounts - Admin: list all linked accounts</li>
+        <li>POST /api/merge/webhook - Merge webhook endpoint</li>
+        <li>GET /api/merge/webhook/debug - Debug webhook configuration</li>
+    </ul>
+    
+    <h3>Merge HRIS Integration:</h3>
+    <ul>
+        <li>GET /api/merge/hris/clients/{id}/employees - List employees</li>
+        <li>GET /api/merge/hris/clients/{id}/employees/{id} - Get employee details</li>
+        <li>GET /api/merge/hris/clients/{id}/employments - List employments</li>
+        <li>GET /api/merge/hris/clients/{id}/locations - List locations</li>
+        <li>GET /api/merge/hris/clients/{id}/groups - List groups</li>
+        <li>GET/POST /api/merge/hris/clients/{id}/time-off - List/create time off</li>
+        <li>GET/POST /api/merge/hris/clients/{id}/timesheet-entries - List/create timesheet entries</li>
+        <li>POST /api/merge/hris/clients/{id}/passthrough - Vendor-specific CRUD operations</li>
     </ul>
     
     <h3>API Documentation:</h3>

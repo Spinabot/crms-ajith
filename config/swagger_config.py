@@ -24,6 +24,8 @@ builderprime_ns = api.namespace('api/builderprime', description='BuilderPrime CR
 jobber_ns = api.namespace('api/jobber', description='Jobber CRM operations')
 capsule_ns = api.namespace('api/capsule', description='Capsule CRM operations')
 jobnimbus_ns = api.namespace('api/jobnimbus', description='JobNimbus CRM operations')
+merge_ns = api.namespace('api/merge', description='Merge CRM integration operations')
+merge_hris_ns = api.namespace('api/merge/hris', description='Merge HRIS integration operations')
 
 # Define CRM integration model
 crm_integration_model = api.model('CRMIntegration', {
@@ -244,6 +246,67 @@ jobnimbus_contact_model = api.model('JobNimbusContact', {
 jobnimbus_response_model = api.model('JobNimbusResponse', {
     'success': fields.Boolean(description='Operation success status'),
     'data': fields.Raw(description='JobNimbus API response data')
+})
+
+# Define Merge CRM models
+merge_link_token_model = api.model('MergeLinkToken', {
+    'end_user_email': fields.String(required=True, description='End user email address', example='owner@example.com'),
+    'end_user_org_name': fields.String(required=True, description='End user organization name', example='Acme Roofing'),
+    'end_user_origin_id': fields.String(required=True, description='End user origin ID', example='client-1'),
+    'integration_slug': fields.String(description='Integration slug (e.g., hubspot, salesforce)', example='hubspot')
+})
+
+merge_linked_account_model = api.model('MergeLinkedAccount', {
+    'account_token': fields.String(required=True, description='Account token from Merge Link', example='abc123...'),
+    'integration_slug': fields.String(description='Integration slug', example='hubspot'),
+    'end_user_origin_id': fields.String(description='End user origin ID', example='client-1'),
+    'end_user_email': fields.String(description='End user email', example='owner@example.com'),
+    'end_user_org_name': fields.String(description='End user organization name', example='Acme Roofing')
+})
+
+merge_contact_model = api.model('MergeContact', {
+    'name': fields.String(description='Contact name', example='Jane Doe'),
+    'email_addresses': fields.List(fields.Raw, description='Email addresses'),
+    'phone_numbers': fields.List(fields.Raw, description='Phone numbers')
+})
+
+merge_contact_create_model = api.model('MergeContactCreate', {
+    'account_token': fields.String(description='Account token (optional, uses first active if omitted)'),
+    'contact': fields.Nested(merge_contact_model, required=True, description='Contact data')
+})
+
+merge_response_model = api.model('MergeResponse', {
+    'success': fields.Boolean(description='Operation success status'),
+    'message': fields.String(description='Response message'),
+    'data': fields.Raw(description='Merge API response data')
+})
+
+# Define Merge HRIS models
+merge_hris_time_off_model = api.model('MergeHRISTimeOff', {
+    'employee': fields.String(description='Employee ID', example='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'),
+    'request_type': fields.String(description='Request type', example='VACATION'),
+    'units': fields.String(description='Units', example='DAYS'),
+    'amount': fields.Float(description='Amount', example=1.0),
+    'start_time': fields.String(description='Start time', example='2025-08-20T09:00:00Z'),
+    'end_time': fields.String(description='End time', example='2025-08-20T17:00:00Z')
+})
+
+merge_hris_timesheet_model = api.model('MergeHRISTimesheet', {
+    'employee': fields.String(description='Employee ID', example='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'),
+    'hours_worked': fields.Float(description='Hours worked', example=8.0),
+    'start_time': fields.String(description='Start time', example='2025-08-13T09:00:00Z'),
+    'end_time': fields.String(description='End time', example='2025-08-13T17:00:00Z')
+})
+
+merge_hris_passthrough_model = api.model('MergeHRISPassthrough', {
+    'account_token': fields.String(description='Account token (optional)'),
+    'method': fields.String(required=True, description='HTTP method', example='PATCH'),
+    'path': fields.String(required=True, description='Vendor path', example='/employees/123'),
+    'data': fields.Raw(description='Request data'),
+    'request_format': fields.String(description='Request format', example='JSON'),
+    'headers': fields.Raw(description='Extra headers'),
+    'base_url_override': fields.String(description='Base URL override'),
+    'run_async': fields.Boolean(description='Run asynchronously', example=False)
 })
 
 @client_ns.route('/')
@@ -698,3 +761,334 @@ class JobNimbusJobs(Resource):
         """
         from controllers.jobnimbus_controller import jobs_create
         return jobs_create()
+
+# ---------- Merge CRM Routes ----------
+
+@merge_ns.route('/clients/<int:client_id>/link-token')
+@merge_ns.param('client_id', 'The client identifier')
+class MergeLinkToken(Resource):
+    @merge_ns.doc('create_merge_link_token')
+    @merge_ns.expect(merge_link_token_model)
+    @merge_ns.marshal_with(merge_response_model, code=200)
+    @merge_ns.response(400, 'Validation Error', error_model)
+    @merge_ns.response(502, 'Merge API Error', error_model)
+    def post(self, client_id):
+        """
+        Create Merge Link token for CRM integration
+
+        Creates a Merge Link session for CRM integration. Returns a link_token and magic_link_url
+        that the client can use to connect their CRM account through Merge.
+        """
+        from controllers.merge_controller import merge_create_link_token
+        return merge_create_link_token(client_id)
+
+@merge_ns.route('/clients/<int:client_id>/linked-accounts')
+@merge_ns.param('client_id', 'The client identifier')
+class MergeLinkedAccounts(Resource):
+    @merge_ns.doc('save_merge_linked_account')
+    @merge_ns.expect(merge_linked_account_model)
+    @merge_ns.marshal_with(merge_response_model, code=201)
+    @merge_ns.response(400, 'Validation Error', error_model)
+    @merge_ns.response(201, 'Linked account saved successfully')
+    def post(self, client_id):
+        """
+        Save Merge linked account
+
+        Saves the account token after the user completes the Merge Link process.
+        This stores the connection between the client and their CRM integration.
+        """
+        from controllers.merge_controller import merge_save_linked_account
+        return merge_save_linked_account(client_id)
+
+@merge_ns.route('/clients/<int:client_id>/crm/contacts')
+@merge_ns.param('client_id', 'The client identifier')
+class MergeContacts(Resource):
+    @merge_ns.doc('list_merge_contacts')
+    @merge_ns.marshal_with(merge_response_model)
+    @merge_ns.response(200, 'Contacts retrieved successfully')
+    @merge_ns.response(404, 'No linked account found', error_model)
+    @merge_ns.response(502, 'Merge API Error', error_model)
+    def get(self, client_id):
+        """
+        List contacts via Merge CRM
+
+        Retrieves contacts from the client's linked CRM account through Merge's unified API.
+        Supports filtering by modification date, pagination, and other Merge parameters.
+        """
+        from controllers.merge_controller import merge_list_contacts
+        return merge_list_contacts(client_id)
+
+    @merge_ns.doc('create_merge_contact')
+    @merge_ns.expect(merge_contact_create_model)
+    @merge_ns.marshal_with(merge_response_model, code=201)
+    @merge_ns.response(201, 'Contact created successfully')
+    @merge_ns.response(400, 'Validation Error', error_model)
+    @merge_ns.response(404, 'No linked account found', error_model)
+    @merge_ns.response(502, 'Merge API Error', error_model)
+    def post(self, client_id):
+        """
+        Create contact via Merge CRM
+
+        Creates a new contact in the client's linked CRM account through Merge's unified API.
+        Uses Merge's common contact model for cross-CRM compatibility.
+        """
+        from controllers.merge_controller import merge_create_contact
+        return merge_create_contact(client_id)
+
+@merge_ns.route('/linked-accounts')
+class MergeAllLinkedAccounts(Resource):
+    @merge_ns.doc('list_all_merge_linked_accounts')
+    @merge_ns.marshal_with(merge_response_model)
+    @merge_ns.response(200, 'Linked accounts retrieved successfully')
+    @merge_ns.response(502, 'Merge API Error', error_model)
+    def get(self):
+        """
+        List all Merge linked accounts (Admin)
+
+        Lists all Merge linked accounts from Merge itself. Useful for debugging and admin purposes.
+        """
+        from controllers.merge_controller import merge_linked_accounts_admin
+        return merge_linked_accounts_admin()
+
+@merge_ns.route('/webhook')
+class MergeWebhook(Resource):
+    @merge_ns.doc('merge_webhook')
+    @merge_ns.response(204, 'Webhook processed successfully')
+    @merge_ns.response(401, 'Invalid webhook signature', error_model)
+    def post(self):
+        """
+        Merge webhook endpoint
+
+        Receives webhooks from Merge for linked account events, sync status updates, and data changes.
+        Verifies webhook signature for security and updates local records accordingly.
+        """
+        from controllers.merge_controller import merge_webhook
+        return merge_webhook()
+
+@merge_ns.route('/webhook/debug')
+class MergeWebhookDebug(Resource):
+    @merge_ns.doc('merge_webhook_debug')
+    @merge_ns.marshal_with(merge_response_model)
+    @merge_ns.response(200, 'Debug information retrieved successfully')
+    def get(self):
+        """
+        Debug webhook configuration
+
+        Provides debug information about webhook configuration and latest webhook data.
+        Useful for troubleshooting webhook setup and verification.
+        """
+        from controllers.merge_controller import merge_webhook_debug
+        return merge_webhook_debug()
+
+# ---------- Merge HRIS Routes ----------
+
+@merge_hris_ns.route('/clients/<int:client_id>/employees')
+@merge_hris_ns.param('client_id', 'The client identifier')
+class MergeHRISEmployees(Resource):
+    @merge_hris_ns.doc('list_hris_employees')
+    @merge_hris_ns.marshal_with(merge_response_model)
+    @merge_hris_ns.response(200, 'Employees retrieved successfully')
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def get(self, client_id):
+        """
+        List HRIS employees (Unified READ)
+
+        Retrieves employees from the client's linked HRIS account through Merge's unified API.
+        Supports filtering by employment status, department, and other Merge parameters.
+        """
+        from controllers.merge_hris_controller import hris_employees
+        return hris_employees(client_id)
+
+@merge_hris_ns.route('/clients/<int:client_id>/employees/<string:employee_id>')
+@merge_hris_ns.param('client_id', 'The client identifier')
+@merge_hris_ns.param('employee_id', 'The employee identifier')
+class MergeHRISEmployeeDetail(Resource):
+    @merge_hris_ns.doc('get_hris_employee')
+    @merge_hris_ns.marshal_with(merge_response_model)
+    @merge_hris_ns.response(200, 'Employee details retrieved successfully')
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def get(self, client_id, employee_id):
+        """
+        Get HRIS employee by ID (Unified READ)
+
+        Retrieves a single employee from the client's linked HRIS account by their unique identifier.
+        """
+        from controllers.merge_hris_controller import hris_employee_detail
+        return hris_employee_detail(client_id, employee_id)
+
+@merge_hris_ns.route('/clients/<int:client_id>/employments')
+@merge_hris_ns.param('client_id', 'The client identifier')
+class MergeHRISEmployments(Resource):
+    @merge_hris_ns.doc('list_hris_employments')
+    @merge_hris_ns.marshal_with(merge_response_model)
+    @merge_hris_ns.response(200, 'Employments retrieved successfully')
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def get(self, client_id):
+        """
+        List HRIS employments
+
+        Retrieves employment records from the client's linked HRIS account.
+        """
+        from controllers.merge_hris_controller import hris_employments
+        return hris_employments(client_id)
+
+@merge_hris_ns.route('/clients/<int:client_id>/locations')
+@merge_hris_ns.param('client_id', 'The client identifier')
+class MergeHRISLocations(Resource):
+    @merge_hris_ns.doc('list_hris_locations')
+    @merge_hris_ns.marshal_with(merge_response_model)
+    @merge_hris_ns.response(200, 'Locations retrieved successfully')
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def get(self, client_id):
+        """
+        List HRIS locations
+
+        Retrieves location records from the client's linked HRIS account.
+        """
+        from controllers.merge_hris_controller import hris_locations
+        return hris_locations(client_id)
+
+@merge_hris_ns.route('/clients/<int:client_id>/groups')
+@merge_hris_ns.param('client_id', 'The client identifier')
+class MergeHRISGroups(Resource):
+    @merge_hris_ns.doc('list_hris_groups')
+    @merge_hris_ns.marshal_with(merge_response_model)
+    @merge_hris_ns.response(200, 'Groups retrieved successfully')
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def get(self, client_id):
+        """
+        List HRIS groups
+
+        Retrieves group records from the client's linked HRIS account.
+        """
+        from controllers.merge_hris_controller import hris_groups
+        return hris_groups(client_id)
+
+@merge_hris_ns.route('/clients/<int:client_id>/time-off')
+@merge_hris_ns.param('client_id', 'The client identifier')
+class MergeHRISTimeOff(Resource):
+    @merge_hris_ns.doc('list_hris_time_off')
+    @merge_hris_ns.marshal_with(merge_response_model)
+    @merge_hris_ns.response(200, 'Time off records retrieved successfully')
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def get(self, client_id):
+        """
+        List Time Off (Unified READ)
+
+        Retrieves time off records from the client's linked HRIS account.
+        """
+        from controllers.merge_hris_controller import hris_time_off
+        return hris_time_off(client_id)
+
+    @merge_hris_ns.doc('create_hris_time_off')
+    @merge_hris_ns.expect(merge_hris_time_off_model)
+    @merge_hris_ns.marshal_with(merge_response_model, code=201)
+    @merge_hris_ns.response(201, 'Time off created successfully')
+    @merge_hris_ns.response(400, 'Validation Error', error_model)
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def post(self, client_id):
+        """
+        Create Time Off (Unified WRITE)
+
+        Creates a new time off request in the client's linked HRIS account.
+        Uses Merge's unified time off model for cross-platform compatibility.
+        """
+        from controllers.merge_hris_controller import hris_time_off
+        return hris_time_off(client_id)
+
+@merge_hris_ns.route('/clients/<int:client_id>/time-off/<string:id_>')
+@merge_hris_ns.param('client_id', 'The client identifier')
+@merge_hris_ns.param('id_', 'The time off record identifier')
+class MergeHRISTimeOffDetail(Resource):
+    @merge_hris_ns.doc('get_hris_time_off')
+    @merge_hris_ns.marshal_with(merge_response_model)
+    @merge_hris_ns.response(200, 'Time off record retrieved successfully')
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def get(self, client_id, id_):
+        """
+        Get Time Off record by ID
+
+        Retrieves a specific time off record from the client's linked HRIS account.
+        """
+        from controllers.merge_hris_controller import hris_time_off_detail
+        return hris_time_off_detail(client_id, id_)
+
+@merge_hris_ns.route('/clients/<int:client_id>/timesheet-entries')
+@merge_hris_ns.param('client_id', 'The client identifier')
+class MergeHRISTimesheetEntries(Resource):
+    @merge_hris_ns.doc('list_hris_timesheet_entries')
+    @merge_hris_ns.marshal_with(merge_response_model)
+    @merge_hris_ns.response(200, 'Timesheet entries retrieved successfully')
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def get(self, client_id):
+        """
+        List Timesheet Entries (Unified READ)
+
+        Retrieves timesheet entries from the client's linked HRIS account.
+        """
+        from controllers.merge_hris_controller import hris_timesheet_entries
+        return hris_timesheet_entries(client_id)
+
+    @merge_hris_ns.doc('create_hris_timesheet_entry')
+    @merge_hris_ns.expect(merge_hris_timesheet_model)
+    @merge_hris_ns.marshal_with(merge_response_model, code=201)
+    @merge_hris_ns.response(201, 'Timesheet entry created successfully')
+    @merge_hris_ns.response(400, 'Validation Error', error_model)
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def post(self, client_id):
+        """
+        Create Timesheet Entry (Unified WRITE)
+
+        Creates a new timesheet entry in the client's linked HRIS account.
+        Uses Merge's unified timesheet model for cross-platform compatibility.
+        """
+        from controllers.merge_hris_controller import hris_timesheet_entries
+        return hris_timesheet_entries(client_id)
+
+@merge_hris_ns.route('/clients/<int:client_id>/timesheet-entries/<string:id_>')
+@merge_hris_ns.param('client_id', 'The client identifier')
+@merge_hris_ns.param('id_', 'The timesheet entry identifier')
+class MergeHRISTimesheetEntryDetail(Resource):
+    @merge_hris_ns.doc('get_hris_timesheet_entry')
+    @merge_hris_ns.marshal_with(merge_response_model)
+    @merge_hris_ns.response(200, 'Timesheet entry retrieved successfully')
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def get(self, client_id, id_):
+        """
+        Get Timesheet Entry by ID
+
+        Retrieves a specific timesheet entry from the client's linked HRIS account.
+        """
+        from controllers.merge_hris_controller import hris_timesheet_entry_detail
+        return hris_timesheet_entry_detail(client_id, id_)
+
+@merge_hris_ns.route('/clients/<int:client_id>/passthrough')
+@merge_hris_ns.param('client_id', 'The client identifier')
+class MergeHRISPassthrough(Resource):
+    @merge_hris_ns.doc('hris_passthrough')
+    @merge_hris_ns.expect(merge_hris_passthrough_model)
+    @merge_hris_ns.marshal_with(merge_response_model)
+    @merge_hris_ns.response(200, 'Passthrough operation completed successfully')
+    @merge_hris_ns.response(400, 'Validation Error', error_model)
+    @merge_hris_ns.response(404, 'No linked account found', error_model)
+    @merge_hris_ns.response(502, 'Merge API Error', error_model)
+    def post(self, client_id):
+        """
+        Vendor-specific CRUD via Merge Passthrough
+
+        Uses Merge's passthrough functionality to call vendor-specific endpoints directly.
+        Useful for operations not covered by unified endpoints (e.g., PATCH, DELETE).
+        """
+        from controllers.merge_hris_controller import hris_passthrough_proxy
+        return hris_passthrough_proxy(client_id)

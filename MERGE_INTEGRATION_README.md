@@ -4,15 +4,19 @@ This document describes the Merge CRM integration that has been added to your Fl
 
 ## Overview
 
-Merge.dev provides a unified API for multiple CRM systems (HubSpot, Salesforce, Pipedrive, etc.). This integration allows your clients to connect their CRM accounts through Merge and then interact with contacts using a single, consistent API.
+Merge.dev provides a unified API for multiple CRM systems (HubSpot, Salesforce, Pipedrive, etc.) and HRIS systems (BambooHR, Personio, Workday, etc.). This integration allows your clients to connect their CRM and HRIS accounts through Merge and then interact with data using a single, consistent API.
 
 ## Architecture
 
 The integration follows your existing pattern:
-- **Models**: `MergeLinkedAccount` stores linked CRM accounts per client
-- **Services**: `merge_service.py` handles all Merge API calls
-- **Controllers**: `merge_controller.py` provides REST endpoints
-- **Routes**: `merge_routes.py` registers the blueprint
+- **Models**: `MergeLinkedAccount` stores linked CRM and HRIS accounts per client
+- **Services**: `merge_service.py` handles all Merge API calls (CRM + HRIS)
+- **Controllers**: 
+  - `merge_controller.py` provides CRM REST endpoints
+  - `merge_hris_controller.py` provides HRIS REST endpoints
+- **Routes**: 
+  - `merge_routes.py` registers the CRM blueprint
+  - `merge_hris_routes.py` registers the HRIS blueprint
 
 ## Environment Setup
 
@@ -21,6 +25,9 @@ Add these environment variables:
 ```bash
 # Required: Your Merge Production Access Key
 export MERGE_API_KEY="cjtuJl3..."  # Get from https://app.merge.dev/settings/api-keys
+
+# Required: Your Merge Webhook Secret
+export MERGE_WEBHOOK_SECRET="your_webhook_secret"  # Get from Merge Dashboard → Webhooks → Security
 
 # Optional: Base URL (defaults to US)
 export MERGE_BASE_URL="https://api.merge.dev"
@@ -42,7 +49,9 @@ python create_tables.py
 
 ## API Endpoints
 
-### 1. Create Link Token
+### CRM Integration
+
+#### 1. Create Link Token
 **POST** `/api/merge/clients/{client_id}/link-token`
 
 Creates a Merge Link session for CRM integration.
@@ -114,6 +123,120 @@ Creates a new contact in the linked CRM.
 
 Lists all Merge linked accounts (admin/debug endpoint).
 
+### 6. Webhook Endpoint
+**POST** `/api/merge/webhook`
+
+Receives webhooks from Merge for linked account events, sync status updates, and data changes.
+Verifies webhook signature for security and updates local records accordingly.
+
+**Headers:**
+- `X-Merge-Webhook-Signature`: HMAC-SHA256 signature for webhook verification
+
+### 7. Webhook Debug
+**GET** `/api/merge/webhook/debug`
+
+Provides debug information about webhook configuration and latest webhook data.
+Useful for troubleshooting webhook setup and verification.
+
+### HRIS Integration
+
+#### 8. List Employees
+**GET** `/api/merge/hris/clients/{client_id}/employees`
+
+Lists employees from the linked HRIS account.
+
+**Query Parameters:**
+- `account_token` (optional): Use specific account token
+- `employment_status`: Filter by employment status
+- `department`: Filter by department
+- `page_size`: Number of results per page
+
+#### 9. Get Employee Details
+**GET** `/api/merge/hris/clients/{client_id}/employees/{employee_id}`
+
+Gets detailed information about a specific employee.
+
+#### 10. List Employments
+**GET** `/api/merge/hris/clients/{client_id}/employments`
+
+Lists employment records from the linked HRIS account.
+
+#### 11. List Locations
+**GET** `/api/merge/hris/clients/{client_id}/locations`
+
+Lists location records from the linked HRIS account.
+
+#### 12. List Groups
+**GET** `/api/merge/hris/clients/{client_id}/groups`
+
+Lists group records from the linked HRIS account.
+
+#### 13. Time Off Operations
+**GET** `/api/merge/hris/clients/{client_id}/time-off`
+
+Lists time off records from the linked HRIS account.
+
+**POST** `/api/merge/hris/clients/{client_id}/time-off`
+
+Creates a new time off request.
+
+**Request Body:**
+```json
+{
+  "model": {
+    "employee": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "request_type": "VACATION",
+    "units": "DAYS",
+    "amount": 1,
+    "start_time": "2025-08-20T09:00:00Z",
+    "end_time": "2025-08-20T17:00:00Z"
+  }
+}
+```
+
+#### 14. Timesheet Entries
+**GET** `/api/merge/hris/clients/{client_id}/timesheet-entries`
+
+Lists timesheet entries from the linked HRIS account.
+
+**POST** `/api/merge/hris/clients/{client_id}/timesheet-entries`
+
+Creates a new timesheet entry.
+
+**Request Body:**
+```json
+{
+  "model": {
+    "employee": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "hours_worked": 8,
+    "start_time": "2025-08-13T09:00:00Z",
+    "end_time": "2025-08-13T17:00:00Z"
+  }
+}
+```
+
+#### 15. Passthrough Operations
+**POST** `/api/merge/hris/clients/{client_id}/passthrough`
+
+Uses Merge's passthrough functionality for vendor-specific operations not covered by unified endpoints.
+
+**Request Body:**
+```json
+{
+  "method": "PATCH",
+  "path": "/employees/123",
+  "data": {"first_name": "Jane"},
+  "request_format": "JSON",
+  "run_async": false
+}
+```
+
+**Use cases:**
+- Update employee information (PATCH)
+- Delete records (DELETE)
+- Vendor-specific endpoints
+- Custom operations
+
 ## Workflow
 
 ### Step 1: Initialize Integration
@@ -125,6 +248,12 @@ Lists all Merge linked accounts (admin/debug endpoint).
 1. Client authenticates with their CRM (HubSpot, Salesforce, etc.)
 2. Merge captures the connection and generates an `account_token`
 3. Your app receives the `account_token` (via webhook or manual input)
+
+**Webhook Integration (Recommended):**
+- Configure webhook URL in Merge Dashboard: `https://yourapp.com/api/merge/webhook`
+- Merge automatically sends webhooks for linked account events
+- Your app verifies webhook signature and updates records automatically
+- No manual intervention required for account token capture
 
 ### Step 3: Save Connection
 1. Call `/linked-accounts` to save the `account_token` in your database
@@ -154,15 +283,67 @@ curl -X POST http://localhost:5001/api/merge/clients/1/link-token \
 
 # 3. Open the magic_link_url in a browser
 # 4. Complete the CRM connection
-# 5. Get the account_token from Merge dashboard
-# 6. Save the linked account
+# 5. Get the account_token from Merge dashboard (or via webhook)
+# 6. Save the linked account (or let webhook handle it automatically)
 # 7. Test listing/creating contacts
-```
 
-### Test Script
-Run the included test script:
+# Webhook Testing (Optional):
+# 8. Test webhook signature verification
+curl -X POST http://localhost:5001/api/merge/webhook \
+  -H 'X-Merge-Webhook-Signature: test_signature' \
+  -d '{"test": "data"}'
+
+# 9. Check webhook debug info
+curl http://localhost:5001/api/merge/webhook/debug
+
+# HRIS Testing Examples:
+# 10. List employees
+curl "http://localhost:5001/api/merge/hris/clients/1/employees?page_size=25"
+
+# 11. Create time off request
+curl -X POST "http://localhost:5001/api/merge/hris/clients/1/time-off" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": {
+      "employee": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "request_type": "VACATION",
+      "units": "DAYS",
+      "amount": 1,
+      "start_time": "2025-08-20T09:00:00Z",
+      "end_time": "2025-08-20T17:00:00Z"
+    }
+  }'
+
+# 12. Create timesheet entry
+curl -X POST "http://localhost:5001/api/merge/hris/clients/1/timesheet-entries" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": {
+      "employee": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "hours_worked": 8,
+      "start_time": "2025-08-13T09:00:00Z",
+      "end_time": "2025-08-13T17:00:00Z"
+    }
+  }'
+
+# 13. Passthrough example (PATCH employee)
+curl -X POST "http://localhost:5001/api/merge/hris/clients/1/passthrough" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "method": "PATCH",
+    "path": "/employees/123",
+    "data": {"first_name": "Jane"},
+    "request_format": "JSON"
+  }'
+
+### Test Scripts
+Run the included test scripts:
 ```bash
+# Test CRM integration
 python test_merge_integration.py
+
+# Test HRIS integration
+python test_merge_hris_integration.py
 ```
 
 ## Error Handling

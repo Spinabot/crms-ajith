@@ -91,6 +91,32 @@ def test_merge_integration():
     print()
     
     print("🎯 Ready to test! Complete the Merge Link first to get your account_token.")
+    print()
+    
+    # Test 5: Webhook Debug
+    print("5️⃣ Testing Webhook Debug...")
+    try:
+        response = requests.get(f"{base_url}/api/merge/webhook/debug")
+        if response.status_code == 200:
+            result = response.json()
+            print("✅ Webhook debug endpoint working!")
+            print(f"   Webhook secret configured: {result.get('webhook_secret_configured', False)}")
+            print(f"   Webhook secret length: {result.get('webhook_secret_length', 0)}")
+            print()
+        else:
+            print(f"❌ Webhook debug failed: {response.status_code}")
+            print()
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Webhook debug request failed: {e}")
+        print()
+    
+    print("🔧 Webhook Setup:")
+    print("1. Set MERGE_WEBHOOK_SECRET environment variable")
+    print("2. Configure webhook URL in Merge Dashboard: {base_url}/api/merge/webhook")
+    print("3. Test webhook signature verification")
+    print()
+    
+    print("🎯 All endpoints are ready for testing!")
 
 if __name__ == "__main__":
     test_merge_integration() 
