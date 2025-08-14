@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import JSONB
 
 # Create a db instance that will be initialized later
 db = SQLAlchemy()
@@ -155,3 +156,23 @@ class JobNimbusClientData(db.Model):
     crm_metadata = db.Column(db.JSON)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class MergeLinkedAccount(db.Model):
+    """Merge CRM linked accounts table"""
+    __tablename__ = 'merge_linked_accounts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id'), nullable=False, index=True)
+    # The token returned when your end user finishes Merge Link
+    account_token = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    # Optional: which vendor they linked (e.g., 'hubspot', 'salesforce', 'pipedrive')
+    integration_slug = db.Column(db.String(100))
+    end_user_origin_id = db.Column(db.String(255))   # your internal user/org key used when creating link token
+    end_user_email = db.Column(db.String(255))
+    end_user_org_name = db.Column(db.String(255))
+    status = db.Column(db.String(50), default='active')  # active|disabled
+    raw = db.Column(JSONB)  # any extra data from Link / Linked Accounts API
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client = db.relationship('Clients', backref=db.backref('merge_linked_accounts', lazy=True))

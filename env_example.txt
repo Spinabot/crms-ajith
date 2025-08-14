@@ -1,0 +1,19 @@
+# Database Configuration
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=spinabot_crm
+
+# Flask Configuration
+FLASK_ENV=development
+FLASK_DEBUG=True
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5001
+
+# Merge CRM Integration
+MERGE_API_KEY=your_production_access_key_here
+MERGE_BASE_URL=https://api.merge.dev
+
+# Example Merge API Key format: cjtuJl3...
+# Get your Production Access Key from: https://app.merge.dev/settings/api-keys 

@@ -91,7 +91,7 @@ def initialize_database(app, db):
             from models import (
                 CRMs, Clients, ClientCRMAuth, CapsuleToken, JobberToken,
                 JobNimbusCredentials, BuilderPrimeClientData, ZohoClientData, HubspotClientData,
-                JobberClientData, JobNimbusClientData
+                JobberClientData, JobNimbusClientData, MergeLinkedAccount
             )
 
             # Check if tables exist by using SQLAlchemy's inspect
@@ -135,6 +135,7 @@ def initialize_database(app, db):
                 print("- hubspot_client_data")
                 print("- jobber_client_data")
                 print("- jobnimbus_client_data")
+                print("- merge_linked_accounts")
                 print("\nSample data added:")
                 print("- 6 CRM systems (Zoho, Jobber, BuilderPrime, HubSpot, JobNimbus, Capsule)")
             else:
@@ -150,6 +151,7 @@ from config.swagger_config import swagger_bp
 from controllers.jobber_controller import jobber_bp
 from controllers.capsule_controller import capsule_bp
 from controllers.jobnimbus_controller import jobnimbus_bp
+from routes.merge_routes import register_merge_routes
 
 app.register_blueprint(capsule_bp)
 app.register_blueprint(jobnimbus_bp)
@@ -157,6 +159,9 @@ app.register_blueprint(jobber_bp)
 app.register_blueprint(client_bp)
 app.register_blueprint(builderprime_bp)
 app.register_blueprint(swagger_bp)
+
+# Register Merge routes
+register_merge_routes(app)
 
 @app.route('/')
 def home():
@@ -196,6 +201,15 @@ def home():
         <li>POST /api/builderprime/clients/{id}/leads - Create lead</li>
         <li>GET /api/builderprime/clients/{id}/leads - Get client leads</li>
         <li>PUT /api/builderprime/clients/{id}/leads/{opportunity_id} - Update lead</li>
+    </ul>
+    
+    <h3>Merge CRM Integration:</h3>
+    <ul>
+        <li>POST /api/merge/clients/{id}/link-token - Create Merge Link token</li>
+        <li>POST /api/merge/clients/{id}/linked-accounts - Save linked account</li>
+        <li>GET /api/merge/clients/{id}/crm/contacts - List contacts</li>
+        <li>POST /api/merge/clients/{id}/crm/contacts - Create contact</li>
+        <li>GET /api/merge/linked-accounts - Admin: list all linked accounts</li>
     </ul>
     
     <h3>API Documentation:</h3>
