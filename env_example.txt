@@ -16,5 +16,14 @@ MERGE_API_KEY=your_production_access_key_here
 MERGE_BASE_URL=https://api.merge.dev
 MERGE_WEBHOOK_SECRET=your_webhook_secret_here
 
+# Merge Unified API (New Implementation)
+MERGE_PROD_KEY=your_production_access_key_here
+MERGE_ACCOUNT_TOKEN=your_linked_account_token_here
+MERGE_CRM_BASE=https://api.merge.dev/api/crm/v1
+MERGE_HRIS_BASE=https://api.merge.dev/api/hris/v1
+
+# CRM Allowlist - restrict to specific integrations
+MERGE_CRM_ALLOWED_SLUGS=salesforce,pipedrive,zoho_crm,zendesk_sell,vtiger,sugarcrm,insightly,keap,ms_dynamics_365_sales,nutshell,pipeliner,salesflare,teamleader,teamwork_crm
+
 # Example Merge API Key format: cjtuJl3...
 # Get your Production Access Key from: https://app.merge.dev/settings/api-keys 

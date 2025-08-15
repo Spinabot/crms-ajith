@@ -2,8 +2,11 @@
 from flask import Blueprint, request, jsonify
 from models import db, MergeLinkedAccount, Clients
 from services.merge_service import (
-    create_link_token, list_contacts, create_contact, list_linked_accounts, MergeServiceError
+    create_link_token, list_contacts, create_contact, list_linked_accounts, MergeServiceError,
+    crm_meta_post, crm_meta_patch, trim_and_validate_payload,
+    crm_linked_accounts, integration_metadata
 )
+from services.merge_slug_resolver import validate_and_resolve_allowlist, get_crm_integrations_catalog
 
 merge_bp = Blueprint("merge", __name__, url_prefix="/api/merge")
 
@@ -42,10 +45,23 @@ def merge_save_linked_account(client_id: int):
     After user finishes Merge Link, you WILL have an account_token (via your UI or webhook).
     Body: { account_token, integration_slug?, end_user_origin_id?, end_user_email?, end_user_org_name?, raw? }
     """
+    import os
+    
     data = request.get_json(force=True) or {}
     account_token = data.get("account_token")
     if not account_token:
         return jsonify({"error": "account_token is required"}), 400
+    
+    # Enforce allowlist when saving a linked account
+    slug = data.get("integration_slug")
+    if slug:
+        valid_slugs, name_to_slug, unresolved = validate_and_resolve_allowlist()
+        if valid_slugs and slug not in valid_slugs:
+            return jsonify({
+                "error": f"integration_slug '{slug}' not allowed",
+                "allowed_slugs": sorted(valid_slugs),
+                "unresolved_vendors": unresolved
+            }), 403
 
     mla = MergeLinkedAccount(
         client_id=client_id,
@@ -106,7 +122,9 @@ def merge_create_contact(client_id: int):
         return jsonify({"error": "contact body is required"}), 400
 
     try:
-        resp = create_contact(account_token, contact_body)
+        # Use meta validation to ensure we only send supported fields
+        clean_contact = trim_and_validate_payload("contacts", contact_body, account_token)
+        resp = create_contact(account_token, {"model": clean_contact})
         return jsonify(resp), 201
     except MergeServiceError as e:
         return jsonify({"error": str(e)}), 502
@@ -117,6 +135,66 @@ def merge_linked_accounts_admin():
     try:
         data = list_linked_accounts(category="crm")
         return jsonify(data), 200
+    except MergeServiceError as e:
+        return jsonify({"error": str(e)}), 502
+
+# --- CRM Meta & Capabilities Routes ---
+@merge_bp.route("/crm/meta/<string:model>/post", methods=["GET"])
+def crm_meta_post_route(model):
+    """Get writable fields for creating a new CRM object"""
+    token = request.args.get("account_token")
+    if not token:
+        return jsonify({"error": "account_token is required"}), 400
+    try:
+        return jsonify(crm_meta_post(model, token)), 200
+    except MergeServiceError as e:
+        return jsonify({"error": str(e)}), 502
+
+@merge_bp.route("/crm/meta/<string:model>/<string:object_id>/patch", methods=["GET"])
+def crm_meta_patch_route(model, object_id):
+    """Get writable fields for updating an existing CRM object"""
+    token = request.args.get("account_token")
+    if not token:
+        return jsonify({"error": "account_token is required"}), 400
+    try:
+        return jsonify(crm_meta_patch(model, object_id, token)), 200
+    except MergeServiceError as e:
+        return jsonify({"error": str(e)}), 502
+
+@merge_bp.route("/crm/capabilities", methods=["GET"])
+def crm_capabilities():
+    """List linked accounts + model/action hints; useful to confirm a vendor is enabled."""
+    try:
+        return jsonify(crm_linked_accounts()), 200
+    except MergeServiceError as e:
+        return jsonify({"error": str(e)}), 502
+
+@merge_bp.route("/crm/integrations", methods=["GET"])
+def crm_integrations_catalog():
+    """All integrations with slugs/logos; you can filter to CRM in your UI."""
+    try:
+        return jsonify(get_crm_integrations_catalog()), 200
+    except MergeServiceError as e:
+        return jsonify({"error": str(e)}), 502
+
+@merge_bp.route("/crm/allowlist/status", methods=["GET"])
+def crm_allowlist_status():
+    """Get current allowlist status and validation results."""
+    try:
+        valid_slugs, name_to_slug, unresolved = validate_and_resolve_allowlist()
+        
+        return jsonify({
+            "allowlist_status": {
+                "total_vendors": len(name_to_slug),
+                "resolved_slugs": len(valid_slugs),
+                "unresolved_names": unresolved,
+                "valid_slugs": sorted(valid_slugs),
+                "name_to_slug_mapping": name_to_slug
+            },
+            "environment": {
+                "MERGE_CRM_ALLOWED_SLUGS": os.getenv("MERGE_CRM_ALLOWED_SLUGS", "not_set")
+            }
+        }), 200
     except MergeServiceError as e:
         return jsonify({"error": str(e)}), 502
 

@@ -203,8 +203,8 @@ def hris_get_timesheet_entry(account_token: str, id_: str) -> Dict[str, Any]:
 
 # ---------- Passthrough (for PATCH/DELETE or other vendor-specific writes) ----------
 def hris_passthrough(account_token: str, method: str, path: str, data: Optional[Any]=None,
-                     request_format: str = "JSON", headers: Optional[Dict[str, str]]=None,
-                     base_url_override: Optional[str]=None, run_async: bool=False) -> Dict[str, Any]:
+                            request_format: str = "JSON", headers: Optional[Dict[str, str]]=None,
+                            base_url_override: Optional[str]=None, run_async: bool=False) -> Dict[str, Any]:
     """
     Use Merge Passthrough/Async Passthrough to call a third-party endpoint directly.
     Example: method="PATCH", path="/employees/123", data={"first_name": "New"}.
@@ -226,4 +226,91 @@ def hris_passthrough(account_token: str, method: str, path: str, data: Optional[
     resp = requests.post(url, headers=_headers(account_token), json=body, timeout=DEFAULT_TIMEOUT)
     if resp.status_code >= 400:
         raise MergeServiceError(f"Merge hris_passthrough failed: {resp.status_code} {resp.text}")
-    return resp.json() 
+    return resp.json()
+
+# --- CRM Meta & Validation helpers ---
+def crm_meta_post(model: str, account_token: str) -> Dict[str, Any]:
+    """GET /{model}/meta/post"""
+    url = f"{MERGE_CRM_BASE}/{model}/meta/post"
+    r = requests.get(url, headers=_headers(account_token), timeout=DEFAULT_TIMEOUT)
+    if r.status_code >= 400:
+        raise MergeServiceError(f"meta/post failed: {r.status_code} {r.text}")
+    return r.json()
+
+def crm_meta_patch(model: str, object_id: str, account_token: str) -> Dict[str, Any]:
+    """GET /{model}/meta/patch/{id}"""
+    url = f"{MERGE_CRM_BASE}/{model}/meta/patch/{object_id}"
+    r = requests.get(url, headers=_headers(account_token), timeout=DEFAULT_TIMEOUT)
+    if r.status_code >= 400:
+        raise MergeServiceError(f"meta/patch failed: {r.status_code} {r.text}")
+    return r.json()
+
+def _collect_writable_fields(meta: Dict[str, Any]) -> tuple[set[str], dict[str, set[str]], set[str]]:
+    """
+    Return (writable_field_names, enum_options_map, required_fields)
+    Based on Merge /meta response shape.
+    """
+    writable: set[str] = set()
+    enums: dict[str, set[str]] = {}
+    required: set[str] = set()
+    for f in (meta.get("data") or meta.get("fields") or []):
+        name = f.get("name")
+        if not name:
+            continue
+        # meta marks writability and required-ness per integration
+        if f.get("is_writable", True):
+            writable.add(name)
+        if f.get("required"):
+            required.add(name)
+        opts = f.get("options")
+        if opts and isinstance(opts, list):
+            enums[name] = {o.get("value") for o in opts if isinstance(o, dict) and o.get("value")}
+    return writable, enums, required
+
+def trim_and_validate_payload(model: str, payload: Dict[str, Any], account_token: str, object_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Calls /meta/post or /meta/patch to ensure we only send supported fields and enum values.
+    Raises MergeServiceError on missing required fields or invalid enums.
+    """
+    meta = crm_meta_patch(model, object_id, account_token) if object_id else crm_meta_post(model, account_token)
+    writable, enums, required = _collect_writable_fields(meta)
+
+    clean: Dict[str, Any] = {}
+    missing_required = []
+    bad_enums = {}
+
+    # Keep only writable fields
+    for k, v in (payload or {}).items():
+        if k in writable:
+            if k in enums and v is not None and str(v) not in enums[k]:
+                bad_enums[k] = {"sent": v, "allowed": sorted(enums[k])[:20]}
+            else:
+                clean[k] = v
+
+    # Check required fields only for POST (no object_id)
+    if object_id is None:
+        for req in required:
+            if clean.get(req) in (None, "", [], {}):
+                missing_required.append(req)
+
+    if missing_required or bad_enums:
+        raise MergeServiceError(f"Validation failed. missing_required={missing_required} bad_enums={bad_enums}")
+
+    return clean
+
+# --- Capabilities / Integrations ---
+def crm_linked_accounts() -> Dict[str, Any]:
+    """GET /linked-accounts (CRM) — shows per-account capabilities."""
+    url = f"{MERGE_BASE_URL}/api/crm/v1/linked-accounts"
+    r = requests.get(url, headers=_headers(), timeout=DEFAULT_TIMEOUT)
+    if r.status_code >= 400:
+        raise MergeServiceError(f"linked-accounts failed: {r.status_code} {r.text}")
+    return r.json()
+
+def integration_metadata() -> Dict[str, Any]:
+    """GET Integration Metadata — list all Merge integrations with slugs, names, logos."""
+    url = f"{MERGE_BASE_URL}/api/integrations"
+    r = requests.get(url, headers=_headers(), timeout=DEFAULT_TIMEOUT)
+    if r.status_code >= 400:
+        raise MergeServiceError(f"integrations metadata failed: {r.status_code} {r.text}")
+    return r.json() 

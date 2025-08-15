@@ -153,6 +153,8 @@ from controllers.capsule_controller import capsule_bp
 from controllers.jobnimbus_controller import jobnimbus_bp
 from routes.merge_routes import register_merge_routes
 from routes.merge_hris_routes import register_merge_hris_routes
+from routes.merge_crm import crm_bp
+from routes.merge_hris import hris_bp
 
 app.register_blueprint(capsule_bp)
 app.register_blueprint(jobnimbus_bp)
@@ -164,6 +166,10 @@ app.register_blueprint(swagger_bp)
 # Register Merge routes
 register_merge_routes(app)
 register_merge_hris_routes(app)
+
+# Register new unified Merge blueprints
+app.register_blueprint(crm_bp)
+app.register_blueprint(hris_bp)
 
 @app.route('/')
 def home():
@@ -205,16 +211,21 @@ def home():
         <li>PUT /api/builderprime/clients/{id}/leads/{opportunity_id} - Update lead</li>
     </ul>
     
-    <h3>Merge CRM Integration:</h3>
-    <ul>
-        <li>POST /api/merge/clients/{id}/link-token - Create Merge Link token</li>
-        <li>POST /api/merge/clients/{id}/linked-accounts - Save linked account</li>
-        <li>GET /api/merge/clients/{id}/crm/contacts - List contacts</li>
-        <li>POST /api/merge/clients/{id}/crm/contacts - Create contact</li>
-        <li>GET /api/merge/linked-accounts - Admin: list all linked accounts</li>
-        <li>POST /api/merge/webhook - Merge webhook endpoint</li>
-        <li>GET /api/merge/webhook/debug - Debug webhook configuration</li>
-    </ul>
+               <h3>Merge CRM Integration:</h3>
+           <ul>
+               <li>POST /api/merge/clients/{id}/link-token - Create Merge Link token</li>
+               <li>POST /api/merge/clients/{id}/linked-accounts - Save linked account</li>
+               <li>GET /api/merge/clients/{id}/crm/contacts - List contacts</li>
+               <li>POST /api/merge/clients/{id}/crm/contacts - Create contact (meta-validated)</li>
+               <li>GET /api/merge/linked-accounts - Admin: list all linked accounts</li>
+               <li>GET /api/merge/crm/capabilities - List linked accounts & capabilities</li>
+               <li>GET /api/merge/crm/integrations - All available integrations (with allowlist status)</li>
+               <li>GET /api/merge/crm/allowlist/status - Check allowlist validation & resolved slugs</li>
+               <li>GET /api/merge/crm/meta/{model}/post - Get writable fields for POST</li>
+               <li>GET /api/merge/crm/meta/{model}/{id}/patch - Get writable fields for PATCH</li>
+               <li>POST /api/merge/webhook - Merge webhook endpoint</li>
+               <li>GET /api/merge/webhook/debug - Debug webhook configuration</li>
+           </ul>
     
     <h3>Merge HRIS Integration:</h3>
     <ul>
@@ -226,6 +237,27 @@ def home():
         <li>GET/POST /api/merge/hris/clients/{id}/time-off - List/create time off</li>
         <li>GET/POST /api/merge/hris/clients/{id}/timesheet-entries - List/create timesheet entries</li>
         <li>POST /api/merge/hris/clients/{id}/passthrough - Vendor-specific CRUD operations</li>
+    </ul>
+    
+    <h3>Merge Unified API (New Implementation):</h3>
+    <ul>
+        <li><strong>CRM Operations:</strong></li>
+        <li>GET/POST /api/merge/crm/accounts - List/create accounts</li>
+        <li>GET/POST/PATCH /api/merge/crm/contacts - Full CRUD on contacts</li>
+        <li>GET/POST /api/merge/crm/leads - List/create leads</li>
+        <li>GET/POST/PATCH /api/merge/crm/opportunities - Full CRUD on opportunities</li>
+        <li>GET/POST/PATCH /api/merge/crm/tasks - Full CRUD on tasks</li>
+        <li>GET/POST /api/merge/crm/notes - List/create notes</li>
+        <li>GET/POST/PATCH /api/merge/crm/engagements - Full CRUD on engagements</li>
+        <li>GET /api/merge/crm/users - List users</li>
+        <li>POST /api/merge/crm/delete-account - Delete linked account</li>
+        <li>POST /api/merge/crm/passthrough - Vendor-specific operations</li>
+        <li><strong>HRIS Operations:</strong></li>
+        <li>GET /api/merge/hris/employees - List employees</li>
+        <li>GET/POST /api/merge/hris/time-off - List/create time off</li>
+        <li>GET/POST /api/merge/hris/timesheet-entries - List/create timesheets</li>
+        <li>POST /api/merge/hris/delete-account - Delete linked account</li>
+        <li>POST /api/merge/hris/passthrough - Vendor-specific operations</li>
     </ul>
     
     <h3>API Documentation:</h3>
