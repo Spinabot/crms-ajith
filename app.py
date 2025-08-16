@@ -153,6 +153,7 @@ from controllers.capsule_controller import capsule_bp
 from controllers.jobnimbus_controller import jobnimbus_bp
 from routes.merge_routes import register_merge_routes
 from routes.merge_hris_routes import register_merge_hris_routes
+from routes.bitrix24_routes import register_bitrix24_routes
 from routes.merge_crm import crm_bp
 from routes.merge_hris import hris_bp
 
@@ -166,6 +167,9 @@ app.register_blueprint(swagger_bp)
 # Register Merge routes
 register_merge_routes(app)
 register_merge_hris_routes(app)
+
+# Register Bitrix24 routes
+register_bitrix24_routes(app)
 
 # Register new unified Merge blueprints
 app.register_blueprint(crm_bp)
@@ -237,6 +241,19 @@ def home():
         <li>GET/POST /api/merge/hris/clients/{id}/time-off - List/create time off</li>
         <li>GET/POST /api/merge/hris/clients/{id}/timesheet-entries - List/create timesheet entries</li>
         <li>POST /api/merge/hris/clients/{id}/passthrough - Vendor-specific CRUD operations</li>
+    </ul>
+    
+    <h3>Bitrix24 CRM Integration:</h3>
+    <ul>
+        <li>POST /api/bitrix/clients/{id}/config - Save Bitrix24 webhook configuration</li>
+        <li>GET /api/bitrix/clients/{id}/config/debug - Debug Bitrix24 configuration</li>
+        <li>GET/POST /api/bitrix/clients/{id}/contacts - List/create contacts</li>
+        <li>GET/PATCH/DELETE /api/bitrix/clients/{id}/contacts/{id} - Full CRUD on contacts</li>
+        <li>GET/POST /api/bitrix/clients/{id}/deals - List/create deals</li>
+        <li>GET/PATCH/DELETE /api/bitrix/clients/{id}/deals/{id} - Full CRUD on deals</li>
+        <li>GET/POST /api/bitrix/clients/{id}/leads - List/create leads</li>
+        <li>GET/PATCH/DELETE /api/bitrix/clients/{id}/leads/{id} - Full CRUD on leads</li>
+        <li>POST /api/bitrix/webhook - Bitrix24 outbound webhook receiver</li>
     </ul>
     
     <h3>Merge Unified API (New Implementation):</h3>
